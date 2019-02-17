@@ -98,8 +98,6 @@ public class ReconnectBridge extends DownstreamBridge {
                 }
             }
 
-            if (Strings.isNullOrEmpty(instance.getShutdownMessage())) doReconnect = true;
-
             // As always, we fire a ServerReconnectEvent and give plugins the possibility to cancel server reconnecting.
             if (!doReconnect || !instance.fireServerReconnectEvent(user, server)) {
                 // Invoke default behaviour if event has been cancelled and disconnect the player.

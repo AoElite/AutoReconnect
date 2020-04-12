@@ -21,6 +21,7 @@ import net.md_5.bungee.api.event.ServerConnectEvent;
 import net.md_5.bungee.netty.PipelineUtils;
 import net.md_5.bungee.protocol.packet.KeepAlive;
 
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -152,11 +153,11 @@ public class ReconnectTask {
         };
 
         // Create a new Netty Bootstrap that contains the ChannelInitializer and the ChannelFutureListener.
-        Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel()).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, instance.getReconnectTimeout()).remoteAddress(target.getAddress());
+        Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(null)).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, instance.getReconnectTimeout()).remoteAddress(target.getAddress());
 
         // Windows is bugged, multi homed users will just have to live with random connecting IPs
         if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
-            b.localAddress(user.getPendingConnection().getListener().getHost().getHostString(), 0);
+            b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
         }
         b.connect().addListener(listener);
     }

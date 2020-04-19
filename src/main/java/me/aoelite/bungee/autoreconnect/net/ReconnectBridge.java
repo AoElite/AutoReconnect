@@ -1,13 +1,13 @@
 package me.aoelite.bungee.autoreconnect.net;
 
+import java.util.List;
+
 import com.google.common.base.Objects;
 
-import com.google.common.base.Strings;
 import me.aoelite.bungee.autoreconnect.AutoReconnect;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
 import net.md_5.bungee.Util;
-import net.md_5.bungee.api.Callback;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -18,7 +18,6 @@ import net.md_5.bungee.chat.ComponentSerializer;
 import net.md_5.bungee.connection.CancelSendSignal;
 import net.md_5.bungee.connection.DownstreamBridge;
 import net.md_5.bungee.protocol.packet.Kick;
-import net.md_5.bungee.protocol.packet.Login;
 
 public class ReconnectBridge extends DownstreamBridge {
 
@@ -51,8 +50,8 @@ public class ReconnectBridge extends DownstreamBridge {
         // Fire ServerReconnectEvent and give plugins the possibility to cancel server reconnecting.
         if (!instance.fireServerReconnectEvent(user, server)) {
             // Invoke default behaviour if event has been cancelled.
-
-            ServerInfo def = bungee.getServerInfo(user.getPendingConnection().getListener().getFallbackServer());
+        	List<String> serverPriority = user.getPendingConnection().getListener().getServerPriority();
+            ServerInfo def = bungee.getServerInfo(serverPriority.size() > 1 ? serverPriority.get(1) : serverPriority.get(0));
             if (server.getInfo() != def) {
                 user.connectNow(def, ServerConnectEvent.Reason.JOIN_PROXY);
                 //user.connect(def);
@@ -72,7 +71,8 @@ public class ReconnectBridge extends DownstreamBridge {
         // This method is called whenever a Kick-Packet is sent from the Minecraft Server to the Minecraft Client.
 
         //.getFallbackServer()
-        ServerInfo def = bungee.getServerInfo(user.getPendingConnection().getListener().getFallbackServer());
+    	List<String> serverPriority = user.getPendingConnection().getListener().getServerPriority();
+        ServerInfo def = bungee.getServerInfo(serverPriority.size() > 1 ? serverPriority.get(1) : serverPriority.get(0));
         if (Objects.equal(server.getInfo(), def)) {
             def = null;
         }

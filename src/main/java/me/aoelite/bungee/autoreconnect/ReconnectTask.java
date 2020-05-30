@@ -8,16 +8,19 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.util.internal.PlatformDependent;
 import me.aoelite.bungee.autoreconnect.net.BasicChannelInitializer;
+import me.aoelite.bungee.autoreconnect.net.packets.util.Util;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.BungeeServerInfo;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.ProxyServer;
+import net.md_5.bungee.api.ServerConnectRequest;
 import net.md_5.bungee.api.Title;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.event.ServerConnectEvent;
+import net.md_5.bungee.api.event.ServerConnectEvent.Reason;
 import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.netty.PipelineUtils;
 import net.md_5.bungee.protocol.packet.KeepAlive;
@@ -89,7 +92,7 @@ public class ReconnectTask {
 				// If the fallback-server is not the same server we tried to reconnect to, send
 				// the user to that one instead.
 				server.setObsolete(true);
-				user.connectNow(def, ServerConnectEvent.Reason.SERVER_DOWN_REDIRECT);
+				connect((BungeeServerInfo) def, false, ServerConnectEvent.Reason.SERVER_DOWN_REDIRECT);
 
 				// Send fancy title if it's enabled in config, otherwise reset the connecting
 				// title.
@@ -105,7 +108,22 @@ public class ReconnectTask {
 					user.sendTitle(ProxyServer.getInstance().createTitle().reset());
 			} else {
 				// Otherwise, disconnect the user with a "Lost Connection"-message.
-				user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
+				// If do-not-disconnect is set to true in config, and the player can enter
+				// limbo, they will be left in limbo instead
+				if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
+					if (!instance.getConfig().getFailedChat().isEmpty())
+						user.sendMessage(instance.getConfig().getFailedChat().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
+					if (!instance.getConfig().getFailedActionBar().isEmpty())
+						user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getFailedActionBar().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName())));
+					else
+						user.sendMessage(ChatMessageType.ACTION_BAR, EMPTY);
+					if (!instance.getConfig().getFailedTitle().isEmpty())
+						createTitle(instance.getConfig().getFailedTitle().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName())).send(user);
+					else
+						user.sendTitle(ProxyServer.getInstance().createTitle().reset());
+				} else {
+					user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
+				}
 			}
 			return;
 		}
@@ -124,7 +142,7 @@ public class ReconnectTask {
 			tries++;
 		}
 
-		if (instance.getConfig().getReconnectingSendInterval() > 0)
+		if (instance.getConfig().getReconnectingSendInterval() <= 0)
 			updateMessages();
 
 		// Establish connection to the server.
@@ -174,6 +192,43 @@ public class ReconnectTask {
 		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
 		// ChannelFutureListener.
 		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(null)).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+
+		// Windows is bugged, multi homed users will just have to live with random
+		// connecting IPs
+		if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
+			b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
+		}
+		b.connect().addListener(listener);
+	}
+
+	private void connect(BungeeServerInfo target, boolean retry, Reason reason) {
+		user.setDimensionChange(true);
+		ServerConnectRequest.Builder builder = ServerConnectRequest.builder().retry(retry).reason(reason).target(target);
+		ServerConnectRequest request = builder.build();
+		user.getPendingConnects().add((ServerInfo) target);
+		BasicChannelInitializer initializer = new BasicChannelInitializer(bungee, user, target);
+		ChannelFutureListener listener = future -> {
+			if (!future.isSuccess()) {
+				future.channel().close();
+				user.getPendingConnects().remove((Object) target);
+				ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
+				if (request.isRetry() && def != null && (user.getServer() == null || def != user.getServer().getInfo())) {
+					user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
+					connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
+				} else {
+					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
+						user.sendMessage(instance.getConfig().getLimboText());
+						instance.keepAlive(user.getUniqueId(), user);
+					} else {
+						user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
+					}
+				}
+			}
+		};
+
+		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
+		// ChannelFutureListener.
+		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(null)).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
 
 		// Windows is bugged, multi homed users will just have to live with random
 		// connecting IPs

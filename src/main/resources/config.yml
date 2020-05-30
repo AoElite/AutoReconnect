@@ -49,12 +49,16 @@ failed-text:
   title: "&cReconnecting failed!"
   actionbar: "&eYou have been moved to the fallback server!"
 
+# The text that should be displayed in chat, when the plugin didn't manage to etablish
+# a connection to any server and the user was redirected to limbo.
+limbo-text: "&cYou are in limbo! Use /server to leave at any time."
+
 # The text that should be displayed, when the plugin didn't manage to etablish
 # a connection to the previous server and connected the player to the fallback server.
 # Leave empty if you don't wish for a generic lost connection message to be displayed.
 # You can add the server name by using the {%server%} variable.
 # You can add the disconnection reason by using the {%reason%} variable.
-kick-text: "Discononected from {%server%}\n{%reason%}"
+kick-text: "Disconnected from {%server%}\n{%reason%}"
 
 # If true, the player is moved to an empty limbo world while attempting to reconnect.
 # This protects against the player moving around and breaking blocks to access normally
@@ -62,6 +66,10 @@ kick-text: "Discononected from {%server%}\n{%reason%}"
 # This requires the Protocolize plugin to function
 # https://www.spigotmc.org/resources/protocolize-protocollib-for-bungeecord-waterfall.63778/
 move-to-empty-world: true
+
+# If true and move-to-empty-world, above, is true, the player will be left in limbo instead
+# of being disconnected if reconnection fails.
+do-not-disconnect: true
 
 # The amount of milliseconds the plugin should wait before attempting to check if the server is alive.
 delay-before-trying: 15000

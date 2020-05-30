@@ -35,8 +35,10 @@ public class Config {
 	private String failedChat = "§cDiscononected from {%server%} with reason: {%reason%}";
 	private String failedTitle = "§cReconnecting failed!";
 	private String failedActionBar = "§eYou have been moved to the fallback server!";
-	private String kickText = "Discononected from {%server%}\\n{%reason%}";
+	private String limboText = "§cYou are in limbo! Use /server to leave at any time.";
+	private String kickText = "Disconnected from {%server%}\\n{%reason%}";
 	private boolean moveToEmptyWorld = true;
+	private boolean doNotDisconnect = true;
 	private long delayBeforeTrying = 15000;
 	private int maxReconnectTries = 2;
 	private long reconnectTime = 1000;
@@ -93,8 +95,10 @@ public class Config {
 				failedChat = ChatColor.translateAlternateColorCodes('&', configuration.getString("failed-text.chat", failedChat));
 				failedTitle = ChatColor.translateAlternateColorCodes('&', configuration.getString("failed-text.title", failedTitle));
 				failedActionBar = ChatColor.translateAlternateColorCodes('&', configuration.getString("failed-text.actionbar", failedActionBar));
+				limboText = ChatColor.translateAlternateColorCodes('&', configuration.getString("limbo-text", limboText));
 				kickText = ChatColor.translateAlternateColorCodes('&', configuration.getString("kick-text", kickText));
 				moveToEmptyWorld = configuration.getBoolean("move-to-empty-world", moveToEmptyWorld);
+				doNotDisconnect = configuration.getBoolean("do-not-disconnect", doNotDisconnect);
 				delayBeforeTrying = configuration.getLong("delay-before-trying", delayBeforeTrying);
 				maxReconnectTries = Math.max(configuration.getInt("max-reconnect-tries", maxReconnectTries), 1);
 				reconnectTime = Math.max(configuration.getLong("reconnect-time", reconnectTime), 0);
@@ -231,6 +235,14 @@ public class Config {
 	}
 
 	/**
+	 * @return Message sent to player when they are unable to be reconnected and are
+	 *         left in limbo
+	 */
+	public String getLimboText() {
+		return limboText;
+	}
+
+	/**
 	 * @return Kick message sent when unable to keep player connected
 	 */
 	public String getKickText() {
@@ -242,6 +254,13 @@ public class Config {
 	 */
 	public boolean getMoveToEmptyWorld() {
 		return moveToEmptyWorld;
+	}
+
+	/**
+	 * @return Whether player should not be disconnected if reconnection fails
+	 */
+	public boolean getDoNotDisconnect() {
+		return doNotDisconnect;
 	}
 
 	/**

@@ -4,21 +4,33 @@ import me.aoelite.bungee.autoreconnect.api.ServerReconnectEvent;
 import me.aoelite.bungee.autoreconnect.net.ReconnectBridge;
 import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import me.aoelite.bungee.autoreconnect.net.packets.PositionLookPacket;
+import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.PacketConstants;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
 import net.md_5.bungee.api.ProxyServer;
+import net.md_5.bungee.api.event.PlayerDisconnectEvent;
 import net.md_5.bungee.api.event.ServerSwitchEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
+import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.event.EventHandler;
 import net.md_5.bungee.netty.ChannelWrapper;
 import net.md_5.bungee.netty.HandlerBoss;
+import net.md_5.bungee.protocol.packet.KeepAlive;
 
 import java.util.HashMap;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public final class AutoReconnect extends Plugin implements Listener {
+	
+	/**
+	 * An instance of {@link Random}
+	 */
+	private static final Random RANDOM = new Random();
 
 	/**
 	 * A HashMap containing all reconnect tasks.
@@ -26,10 +38,23 @@ public final class AutoReconnect extends Plugin implements Listener {
 	private HashMap<UUID, ReconnectTask> reconnectTasks = new HashMap<>();
 
 	/**
+	 * A HashMap containing all users that should be kept alive.
+	 */
+	private ConcurrentHashMap<UUID, UserConnection> keepAliveUsers = new ConcurrentHashMap<>();
+	
+	/**
+	 * A task to keep the listed user connections alive
+	 */
+	private ScheduledTask keepAliveTask = null;
+
+	/**
 	 * Config instance
 	 */
 	private Config config;
-	
+
+	/**
+	 * Whether or not the Protocolize plugin is loaded
+	 */
 	private boolean isProtocolizeLoaded = false;
 
 	@Override
@@ -37,13 +62,13 @@ public final class AutoReconnect extends Plugin implements Listener {
 		getLogger().info("AutoReconnect: A fork of Bungeecord-Reconnect updated by PseudoResonance and AoElite");
 		// register Listener
 		getProxy().getPluginManager().registerListener(this, this);
-		
+
 		try {
 			isProtocolizeLoaded = Class.forName("de.exceptionflug.protocolize.api.event.PacketReceiveEvent") != null;
 		} catch (ClassNotFoundException e) {
 			isProtocolizeLoaded = false;
 		}
-		
+
 		if (isProtocolizeLoaded())
 			PacketManager.register(this);
 
@@ -51,6 +76,24 @@ public final class AutoReconnect extends Plugin implements Listener {
 		config = new Config(this);
 		if (config.getMoveToEmptyWorld() && !isProtocolizeLoaded()) {
 			this.getLogger().severe("Protocolize is not installed! Unable to send reconnecting players to an empty world!");
+		} else if (config.getMoveToEmptyWorld() && isProtocolizeLoaded() && config.getDoNotDisconnect()) {
+			keepAliveTask = BungeeCord.getInstance().getScheduler().schedule(this, new Runnable() {
+				@Override
+				public void run() {
+					for (UserConnection user : keepAliveUsers.values()) {
+						if (isUserOnline(user))
+							user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
+					}
+				}
+			}, 5, 5, TimeUnit.SECONDS);
+		}
+	}
+
+	@Override
+	public void onDisable() {
+		keepAliveTask.cancel();
+		for (ReconnectTask task : reconnectTasks.values()) {
+			task.cancel();
 		}
 	}
 
@@ -74,8 +117,23 @@ public final class AutoReconnect extends Plugin implements Listener {
 		serverCh.getHandle().pipeline().get(HandlerBoss.class).setHandler(downstreamBridge);
 
 		// Cancel the reconnect task (if any exist) and clear title and action bar.
-		if (isReconnecting(user.getUniqueId())) {
-			cancelReconnectTask(user.getUniqueId());
+		UUID uuid = user.getUniqueId();
+		if (isReconnecting(uuid)) {
+			cancelReconnectTask(uuid);
+		}
+		if (isKeptAlive(uuid)) {
+			cancelKeepAlive(uuid);
+		}
+	}
+
+	@EventHandler
+	public void onPlayerDisconnect(PlayerDisconnectEvent event) {
+		UUID uuid = event.getPlayer().getUniqueId();
+		if (isReconnecting(uuid)) {
+			cancelReconnectTask(uuid);
+		}
+		if (isKeptAlive(uuid)) {
+			cancelKeepAlive(uuid);
 		}
 	}
 
@@ -180,6 +238,39 @@ public final class AutoReconnect extends Plugin implements Listener {
 	}
 
 	/**
+	 * Removes a user from the keep alive list
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 * @param user
+	 *            The user instance
+	 */
+	void keepAlive(UUID uuid, UserConnection user) {
+		keepAliveUsers.put(uuid, user);
+	}
+
+	/**
+	 * Removes a user from the keep alive list
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 */
+	void cancelKeepAlive(UUID uuid) {
+		keepAliveUsers.remove(uuid);
+	}
+
+	/**
+	 * Checks whether a User connection is being kept alive.
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 * @return true, if the user connection is being kept alive.
+	 */
+	public boolean isKeptAlive(UUID uuid) {
+		return keepAliveUsers.containsKey(uuid);
+	}
+
+	/**
 	 * Returns the config instance
 	 * 
 	 * @return Config instance
@@ -191,7 +282,7 @@ public final class AutoReconnect extends Plugin implements Listener {
 	/**
 	 * @return true if Protocolize API is loaded
 	 */
-	private boolean isProtocolizeLoaded() {
+	public boolean isProtocolizeLoaded() {
 		return isProtocolizeLoaded;
 	}
 

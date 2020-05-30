@@ -1,5 +1,5 @@
 name: AutoReconnect
 version: ${project.version}
-authors: [AoElite,krusic22,5zig,Krymonota]
+authors: [PseudoResonance,AoElite,krusic22,5zig,Krymonota]
 main: me.aoelite.bungee.autoreconnect.AutoReconnect
 description: Automatically reconnects you to the server

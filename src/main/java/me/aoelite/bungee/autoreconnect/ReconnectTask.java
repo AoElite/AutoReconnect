@@ -191,7 +191,7 @@ public class ReconnectTask {
 
 		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
 		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(null)).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(target.getAddress())).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
 
 		// Windows is bugged, multi homed users will just have to live with random
 		// connecting IPs
@@ -228,7 +228,7 @@ public class ReconnectTask {
 
 		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
 		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(null)).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
+		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
 
 		// Windows is bugged, multi homed users will just have to live with random
 		// connecting IPs

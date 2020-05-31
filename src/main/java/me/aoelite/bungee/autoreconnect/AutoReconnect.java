@@ -71,7 +71,7 @@ public final class AutoReconnect extends Plugin implements Listener {
 
 		if (isProtocolizeLoaded())
 			PacketManager.register(this);
-
+		
 		// load Configuration
 		config = new Config(this);
 		if (config.getMoveToEmptyWorld() && !isProtocolizeLoaded()) {
@@ -87,6 +87,8 @@ public final class AutoReconnect extends Plugin implements Listener {
 				}
 			}, 5, 5, TimeUnit.SECONDS);
 		}
+		// Initialize reflection if necessary
+		ReconnectTask.init();
 	}
 
 	@Override

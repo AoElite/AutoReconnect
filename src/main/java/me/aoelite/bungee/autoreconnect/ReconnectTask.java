@@ -25,15 +25,22 @@ import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.netty.PipelineUtils;
 import net.md_5.bungee.protocol.packet.KeepAlive;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 public class ReconnectTask {
 
 	private static final Random RANDOM = new Random();
 	private static final TextComponent EMPTY = new TextComponent("");
+
+	private static boolean oldPipelineUtils = false;
+	private static Method getPipelineChannel = null;
 
 	private final AutoReconnect instance;
 	private final ProxyServer bungee;
@@ -191,7 +198,7 @@ public class ReconnectTask {
 
 		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
 		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(target.getAddress())).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
 
 		// Windows is bugged, multi homed users will just have to live with random
 		// connecting IPs
@@ -228,7 +235,7 @@ public class ReconnectTask {
 
 		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
 		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(PipelineUtils.getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
+		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
 
 		// Windows is bugged, multi homed users will just have to live with random
 		// connecting IPs
@@ -331,6 +338,36 @@ public class ReconnectTask {
 				// For some reason, we have to reset and clear the title, so it completely
 				// disappears -> BungeeCord bug?
 				bungee.createTitle().reset().clear().send(user);
+			}
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Class<? extends Channel> getChannel(SocketAddress addr) {
+		if (!oldPipelineUtils)
+			return PipelineUtils.getChannel(addr);
+		else
+			try {
+				return (Class<? extends Channel>) getPipelineChannel.invoke(null);
+			} catch (ClassCastException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+				e.printStackTrace();
+			}
+		return null;
+	}
+	
+	protected static void init() {
+		try {
+			PipelineUtils.class.getMethod("getChannel", SocketAddress.class);
+		} catch (NoSuchMethodException | SecurityException e) {
+			oldPipelineUtils = true;
+		}
+		if (oldPipelineUtils) {
+			Logger.getLogger("AutoReconnect").info("Detected old BungeeCord build! Using compatibility mode!");
+			try {
+				getPipelineChannel = PipelineUtils.class.getMethod("getChannel");
+				getPipelineChannel.setAccessible(true);
+			} catch (NoSuchMethodException | SecurityException e) {
+				e.printStackTrace();
 			}
 		}
 	}

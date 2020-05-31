@@ -1,0 +1,1 @@
+Place compiled BungeeCord.jar here for Maven

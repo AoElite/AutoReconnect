@@ -5,7 +5,6 @@ import me.aoelite.bungee.autoreconnect.net.ReconnectBridge;
 import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import me.aoelite.bungee.autoreconnect.net.packets.PositionLookPacket;
 import net.md_5.bungee.BungeeCord;
-import net.md_5.bungee.PacketConstants;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
 import net.md_5.bungee.api.ProxyServer;
@@ -17,7 +16,9 @@ import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.event.EventHandler;
 import net.md_5.bungee.netty.ChannelWrapper;
 import net.md_5.bungee.netty.HandlerBoss;
+import net.md_5.bungee.protocol.DefinedPacket;
 import net.md_5.bungee.protocol.packet.KeepAlive;
+import net.md_5.bungee.protocol.packet.Respawn;
 
 import java.util.HashMap;
 import java.util.Random;
@@ -93,7 +94,8 @@ public final class AutoReconnect extends Plugin implements Listener {
 
 	@Override
 	public void onDisable() {
-		keepAliveTask.cancel();
+		if (keepAliveTask != null)
+			keepAliveTask.cancel();
 		for (ReconnectTask task : reconnectTasks.values()) {
 			task.cancel();
 		}
@@ -198,13 +200,20 @@ public final class AutoReconnect extends Plugin implements Listener {
 	 */
 	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
 		if (getConfig().getMoveToEmptyWorld() && isProtocolizeLoaded()) {
-			if (user.getDimension() <= 0) {
-				user.unsafe().sendPacket(PacketConstants.DIM1_SWITCH);
-				user.setDimension(1);
-			} else if (user.getDimension() == 1) {
-				user.unsafe().sendPacket(PacketConstants.DIM2_SWITCH);
-				user.setDimension(-1);
+			Object newDim;
+			String worldName = "";
+			if (user.getDimension() instanceof Integer) {
+				newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
+			} else {
+				worldName = "minecraft:overworld".equals((String) user.getDimension())
+						? "minecraft:the_end"
+						: "minecraft:overworld";
+				newDim = worldName;
 			}
+			user.setDimension(newDim);
+			user.unsafe().sendPacket((DefinedPacket) new Respawn(newDim, worldName, 0L,
+					(short) 0, (short) 0, (short) 0,
+					"default", false, true, false));
 			user.unsafe().sendPacket(new PositionLookPacket(0, 64, 0, 0f, 0f, (byte) 0, 0));
 		}
 		ReconnectTask reconnectTask = reconnectTasks.get(user.getUniqueId());

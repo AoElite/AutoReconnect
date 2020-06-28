@@ -1,273 +1,300 @@
 package me.aoelite.bungee.autoreconnect;
 
-import com.google.common.base.Strings;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Files;
 import me.aoelite.bungee.autoreconnect.api.ServerReconnectEvent;
 import me.aoelite.bungee.autoreconnect.net.ReconnectBridge;
+import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
+import me.aoelite.bungee.autoreconnect.net.packets.PositionLookPacket;
+import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
-import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ProxyServer;
+import net.md_5.bungee.api.event.PlayerDisconnectEvent;
 import net.md_5.bungee.api.event.ServerSwitchEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
-import net.md_5.bungee.config.Configuration;
-import net.md_5.bungee.config.ConfigurationProvider;
-import net.md_5.bungee.config.YamlConfiguration;
+import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.event.EventHandler;
 import net.md_5.bungee.netty.ChannelWrapper;
 import net.md_5.bungee.netty.HandlerBoss;
+import net.md_5.bungee.protocol.DefinedPacket;
+import net.md_5.bungee.protocol.packet.KeepAlive;
+import net.md_5.bungee.protocol.packet.Respawn;
 
-import java.io.*;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Random;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public final class AutoReconnect extends Plugin implements Listener {
+	
+	/**
+	 * An instance of {@link Random}
+	 */
+	private static final Random RANDOM = new Random();
 
-    private String reconnectingTitle = "&7Reconnecting{%dots%}";
-    private String reconnectingActionBar = "&a&lPlease do not leave! &7Reconnecting to server{%dots%}";
-    private String connectingTitle = "&aConnecting..";
-    private String connectingActionBar = "&7Connecting you to the server..";
-    private String failedTitle = "&cReconnecting failed!";
-    private String failedActionBar = "&eYou have been moved to the fallback server!";
-    private int delayBeforeTrying = 10000;
-    private int maxReconnectTries = 2;
-    private int reconnectMillis = 1000;
-    private int reconnectTimeout = 5000;
-    private List<String> ignoredServers = new ArrayList<>();
-    private String shutdownMessage = "Server closed";
-    private Pattern shutdownPattern = null;
+	/**
+	 * A HashMap containing all reconnect tasks.
+	 */
+	private HashMap<UUID, ReconnectTask> reconnectTasks = new HashMap<>();
 
-    /**
-     * A HashMap containing all reconnect tasks.
-     */
-    private HashMap<UUID, ReconnectTask> reconnectTasks = new HashMap<>();
+	/**
+	 * A HashMap containing all users that should be kept alive.
+	 */
+	private ConcurrentHashMap<UUID, UserConnection> keepAliveUsers = new ConcurrentHashMap<>();
+	
+	/**
+	 * A task to keep the listed user connections alive
+	 */
+	private ScheduledTask keepAliveTask = null;
 
-    @Override
-    public void onEnable() {
-        getLogger().info("AutoReconnect: A fork of Bungeecord-Reconnect updated by AoElite");
-        // register Listener
-        getProxy().getPluginManager().registerListener(this, this);
+	/**
+	 * Config instance
+	 */
+	private Config config;
 
-        // load Configuration
-        loadConfig();
-    }
+	/**
+	 * Whether or not the Protocolize plugin is loaded
+	 */
+	private boolean isProtocolizeLoaded = false;
 
-    /**
-     * Tries to load the config from the config file or creates a default config if the file does not exist.
-     */
-    private void loadConfig() {
-        try {
-            if (!getDataFolder().exists() && !getDataFolder().mkdir()) {
-                throw new IOException("Could not create plugin directory!");
-            }
-            File configFile = new File(getDataFolder(), "config.yml");
-            if (configFile.exists()) {
-                Configuration configuration = ConfigurationProvider.getProvider(YamlConfiguration.class).load(configFile);
-                int pluginConfigVersion = ConfigurationProvider.getProvider(YamlConfiguration.class).load(getResourceAsStream("config.yml")).getInt("version");
-                if (configuration.getInt("version") < pluginConfigVersion) {
-                    getLogger().info("Found an old config version! Replacing with new one...");
-                    File oldConfigFile = new File(getDataFolder(), "config.old.yml");
-                    Files.move(configFile, oldConfigFile);
-                    getLogger().info("A backup of your old config has been saved to " + oldConfigFile + "!");
-                    saveDefaultConfig(configFile);
-                    return;
-                }
+	@Override
+	public void onEnable() {
+		getLogger().info("AutoReconnect: A fork of Bungeecord-Reconnect updated by PseudoResonance and AoElite");
+		// register Listener
+		getProxy().getPluginManager().registerListener(this, this);
 
-                reconnectingTitle = configuration.getString("reconnecting-text.title", reconnectingTitle);
-                reconnectingActionBar = configuration.getString("reconnecting-text.actionbar", reconnectingActionBar);
-                connectingTitle = configuration.getString("connecting-text.title", connectingTitle);
-                connectingActionBar = configuration.getString("connecting-text.actionbar", connectingActionBar);
-                failedTitle = configuration.getString("failed-text.title", failedTitle);
-                failedActionBar = configuration.getString("failed-text.actionbar", failedActionBar);
-                delayBeforeTrying = configuration.getInt("delay-before-trying", delayBeforeTrying);
-                maxReconnectTries = Math.max(configuration.getInt("max-reconnect-tries", maxReconnectTries), 1);
-                reconnectMillis = Math.max(configuration.getInt("reconnect-time", reconnectMillis), 0);
-                reconnectTimeout = Math.max(configuration.getInt("reconnect-timeout", reconnectTimeout), 1000);
-                ignoredServers = configuration.getStringList("ignored-servers");
-                String shutdownText = configuration.getString("shutdown.text");
-                if (Strings.isNullOrEmpty(shutdownText)) {
-                    shutdownMessage = null;
-                    shutdownPattern = null;
-                } else if (!configuration.getBoolean("shutdown.regex")) {
-                    shutdownMessage = ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&', shutdownText)); // strip all color codes
-                } else {
-                    try {
-                        shutdownPattern = Pattern.compile(shutdownText);
-                        shutdownMessage = null;
-                    } catch (Exception e) {
-                        getLogger().warning("Could not compile shutdown regex! Please check your config! Using default shutdown message...");
-                    }
-                }
-            } else {
-                saveDefaultConfig(configFile);
-            }
-        } catch (IOException e) {
-            getLogger().warning("Could not load config, using default values...");
-            e.printStackTrace();
-        }
-    }
+		try {
+			isProtocolizeLoaded = Class.forName("de.exceptionflug.protocolize.api.event.PacketReceiveEvent") != null;
+		} catch (ClassNotFoundException e) {
+			isProtocolizeLoaded = false;
+		}
 
-    private void saveDefaultConfig(File configFile) throws IOException {
-        if (!configFile.createNewFile()) {
-            throw new IOException("Could not create default config!");
-        }
-        try (InputStream is = getResourceAsStream("config.yml");
-             OutputStream os = new FileOutputStream(configFile)) {
-            ByteStreams.copy(is, os);
-        }
-    }
+		if (isProtocolizeLoaded())
+			PacketManager.register(this);
+		
+		// load Configuration
+		config = new Config(this);
+		if (config.getMoveToEmptyWorld() && !isProtocolizeLoaded()) {
+			this.getLogger().severe("Protocolize is not installed! Unable to send reconnecting players to an empty world!");
+		} else if (config.getMoveToEmptyWorld() && isProtocolizeLoaded() && config.getDoNotDisconnect()) {
+			keepAliveTask = BungeeCord.getInstance().getScheduler().schedule(this, new Runnable() {
+				@Override
+				public void run() {
+					for (UserConnection user : keepAliveUsers.values()) {
+						if (isUserOnline(user))
+							user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
+					}
+				}
+			}, 5, 5, TimeUnit.SECONDS);
+		}
+		// Initialize reflection if necessary
+		ReconnectTask.init();
+	}
 
-    @EventHandler
-    public void onServerSwitch(ServerSwitchEvent event) {
-        // We need to override the Downstream class of each user so that we can override the disconnect methods of it.
-        // ServerSwitchEvent is called just right after the Downstream Bridge has been initialized, so we simply can
-        // instantiate here our own implementation of the DownstreamBridge
-        //
-        // @see net.md_5.bungee.ServerConnector#L249
+	@Override
+	public void onDisable() {
+		if (keepAliveTask != null)
+			keepAliveTask.cancel();
+		for (ReconnectTask task : reconnectTasks.values()) {
+			task.cancel();
+		}
+	}
 
-        ProxyServer bungee = getProxy();
-        UserConnection user = (UserConnection) event.getPlayer();
-        ServerConnection server = user.getServer();
-        ChannelWrapper ch = server.getCh();
+	@EventHandler
+	public void onServerSwitch(ServerSwitchEvent event) {
+		// We need to override the Downstream class of each user so that we can override
+		// the disconnect methods of it.
+		// ServerSwitchEvent is called just right after the Downstream Bridge has been
+		// initialized, so we simply can
+		// instantiate here our own implementation of the DownstreamBridge
+		//
+		// @see net.md_5.bungee.ServerConnector#L249
 
-        ReconnectBridge bridge = new ReconnectBridge(this, bungee, user, server);
-        ch.getHandle().pipeline().get(HandlerBoss.class).setHandler(bridge);
+		ProxyServer bungee = getProxy();
+		UserConnection user = (UserConnection) event.getPlayer();
+		ServerConnection server = user.getServer();
 
-        // Cancel the reconnect task (if any exist) and clear title and action bar.
-        if (isReconnecting(user.getUniqueId())) {
-            cancelReconnectTask(user.getUniqueId());
-        }
-    }
+		ChannelWrapper serverCh = server.getCh();
 
-    /**
-     * Checks whether the current server should be ignored and fires a ServerReconnectEvent afterwards.
-     *
-     * @param user   The User that should be reconnected.
-     * @param server The Server the User should be reconnected to.
-     * @return true, if the ignore list does not contain the server and the event hasn't been canceled.
-     */
-    public boolean fireServerReconnectEvent(UserConnection user, ServerConnection server) {
-        if (ignoredServers.contains(server.getInfo().getName())) {
-            return false;
-        }
-        ServerReconnectEvent event = getProxy().getPluginManager().callEvent(new ServerReconnectEvent(user, server.getInfo()));
-        return !event.isCancelled();
-    }
+		ReconnectBridge downstreamBridge = new ReconnectBridge(this, bungee, user, server);
+		serverCh.getHandle().pipeline().get(HandlerBoss.class).setHandler(downstreamBridge);
 
-    /**
-     * Checks if a UserConnection is still online.
-     *
-     * @param user The User that should be checked.
-     * @return true, if the UserConnection is still online.
-     */
-    public boolean isUserOnline(UserConnection user) {
-        return getProxy().getPlayer(user.getUniqueId()) != null;
-    }
+		// Cancel the reconnect task (if any exist) and clear title and action bar.
+		UUID uuid = user.getUniqueId();
+		if (isReconnecting(uuid)) {
+			cancelReconnectTask(uuid);
+		}
+		if (isKeptAlive(uuid)) {
+			cancelKeepAlive(uuid);
+		}
+	}
 
-    /**
-     * Reconnects a User to a Server, as long as the user is currently online. If he isn't, his reconnect task (if he had one)
-     * will be canceled.
-     *
-     * @param user   The User that should be reconnected.
-     * @param server The Server the User should be connected to.
-     */
-    public void reconnectIfOnline(UserConnection user, ServerConnection server) {
-        if (isUserOnline(user)) {
-            if (!isReconnecting(user.getUniqueId())) {
-                reconnect(user, server);
-            }
-        } else {
-            cancelReconnectTask(user.getUniqueId());
-        }
-    }
+	@EventHandler
+	public void onPlayerDisconnect(PlayerDisconnectEvent event) {
+		UUID uuid = event.getPlayer().getUniqueId();
+		if (isReconnecting(uuid)) {
+			cancelReconnectTask(uuid);
+		}
+		if (isKeptAlive(uuid)) {
+			cancelKeepAlive(uuid);
+		}
+	}
 
-    /**
-     * Reconnects the User without checking whether he's online or not.
-     *
-     * @param user   The User that should be reconnected.
-     * @param server The Server the User should be connected to.
-     */
-    private void reconnect(UserConnection user, ServerConnection server) {
-        ReconnectTask reconnectTask = reconnectTasks.get(user.getUniqueId());
-        if (reconnectTask == null) {
-            reconnectTasks.put(user.getUniqueId(), reconnectTask = new ReconnectTask(this, getProxy(), user, server, System.currentTimeMillis()));
-        }
-        reconnectTask.tryReconnect();
-    }
+	/**
+	 * Checks whether the current server should be ignored and fires a
+	 * ServerReconnectEvent afterwards.
+	 *
+	 * @param user
+	 *            The User that should be reconnected.
+	 * @param server
+	 *            The Server the User should be reconnected to.
+	 * @return true, if the ignore list does not contain the server and the event
+	 *         hasn't been canceled.
+	 */
+	public boolean fireServerReconnectEvent(UserConnection user, ServerConnection server) {
+		if (config.getIgnoredServers().contains(server.getInfo().getName())) {
+			return false;
+		}
+		ServerReconnectEvent event = getProxy().getPluginManager().callEvent(new ServerReconnectEvent(user, server.getInfo()));
+		return !event.isCancelled();
+	}
 
-    /**
-     * Removes a reconnect task from the main HashMap
-     *
-     * @param uuid The UniqueId of the User.
-     */
-    void cancelReconnectTask(UUID uuid) {
-        ReconnectTask task = reconnectTasks.remove(uuid);
-        if (task != null && getProxy().getPlayer(uuid) != null) {
-            task.cancel();
-        }
-    }
+	/**
+	 * Checks if a UserConnection is still online.
+	 *
+	 * @param user
+	 *            The User that should be checked.
+	 * @return true, if the UserConnection is still online.
+	 */
+	public boolean isUserOnline(UserConnection user) {
+		return getProxy().getPlayer(user.getUniqueId()) != null;
+	}
 
-    /**
-     * Checks whether a User has got a reconnect task.
-     *
-     * @param uuid The UniqueId of the User.
-     * @return true, if there is a task that tries to reconnect the User to a server.
-     */
-    public boolean isReconnecting(UUID uuid) {
-        return reconnectTasks.containsKey(uuid);
-    }
+	/**
+	 * Reconnects a User to a Server, as long as the user is currently online. If he
+	 * isn't, his reconnect task (if he had one) will be canceled.
+	 *
+	 * @param user
+	 *            The User that should be reconnected.
+	 * @param server
+	 *            The Server the User should be connected to.
+	 */
+	public void reconnectIfOnline(UserConnection user, ServerConnection server, String kickMessage) {
+		if (isUserOnline(user)) {
+			if (!isReconnecting(user.getUniqueId())) {
+				reconnect(user, server, kickMessage);
+			}
+		} else {
+			cancelReconnectTask(user.getUniqueId());
+		}
+	}
 
-    public String getReconnectingTitle() {
-        return ChatColor.translateAlternateColorCodes('&', reconnectingTitle);
-    }
+	/**
+	 * Reconnects the User without checking whether he's online or not.
+	 *
+	 * @param user
+	 *            The User that should be reconnected.
+	 * @param server
+	 *            The Server the User should be connected to.
+	 */
+	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
+		if (getConfig().getMoveToEmptyWorld() && isProtocolizeLoaded()) {
+			Object newDim;
+			String worldName = "";
+			if (user.getDimension() instanceof Integer) {
+				newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
+			} else {
+				worldName = "minecraft:overworld".equals((String) user.getDimension())
+						? "minecraft:the_end"
+						: "minecraft:overworld";
+				newDim = worldName;
+			}
+			user.setDimension(newDim);
+			user.unsafe().sendPacket((DefinedPacket) new Respawn(newDim, worldName, 0L,
+					(short) 0, (short) 0, (short) 0,
+					"default", false, true, false));
+			user.unsafe().sendPacket(new PositionLookPacket(0, 64, 0, 0f, 0f, (byte) 0, 0));
+		}
+		ReconnectTask reconnectTask = reconnectTasks.get(user.getUniqueId());
+		if (reconnectTask == null) {
+			reconnectTasks.put(user.getUniqueId(), reconnectTask = new ReconnectTask(this, getProxy(), user, server, kickMessage));
+		}
+		reconnectTask.tryReconnect();
+	}
 
-    public String getReconnectingActionBar() {
-        return ChatColor.translateAlternateColorCodes('&', reconnectingActionBar);
-    }
+	/**
+	 * Removes a reconnect task from the main HashMap
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 */
+	void cancelReconnectTask(UUID uuid) {
+		ReconnectTask task = reconnectTasks.remove(uuid);
+		if (task != null && getProxy().getPlayer(uuid) != null) {
+			task.cancel();
+		}
+	}
 
-    public String getConnectingTitle() {
-        return ChatColor.translateAlternateColorCodes('&', connectingTitle);
-    }
+	/**
+	 * Checks whether a User has got a reconnect task.
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 * @return true, if there is a task that tries to reconnect the User to a
+	 *         server.
+	 */
+	public boolean isReconnecting(UUID uuid) {
+		return reconnectTasks.containsKey(uuid);
+	}
 
-    public String getConnectingActionBar() {
-        return ChatColor.translateAlternateColorCodes('&', connectingActionBar);
-    }
+	/**
+	 * Removes a user from the keep alive list
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 * @param user
+	 *            The user instance
+	 */
+	void keepAlive(UUID uuid, UserConnection user) {
+		keepAliveUsers.put(uuid, user);
+	}
 
-    public String getFailedTitle() {
-        return ChatColor.translateAlternateColorCodes('&', failedTitle);
-    }
+	/**
+	 * Removes a user from the keep alive list
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 */
+	void cancelKeepAlive(UUID uuid) {
+		keepAliveUsers.remove(uuid);
+	}
 
-    public String getFailedActionBar() {
-        return ChatColor.translateAlternateColorCodes('&', failedActionBar);
-    }
+	/**
+	 * Checks whether a User connection is being kept alive.
+	 *
+	 * @param uuid
+	 *            The UniqueId of the User.
+	 * @return true, if the user connection is being kept alive.
+	 */
+	public boolean isKeptAlive(UUID uuid) {
+		return keepAliveUsers.containsKey(uuid);
+	}
 
-    public int getDelayBeforeTrying() {
-        return delayBeforeTrying;
-    }
+	/**
+	 * Returns the config instance
+	 * 
+	 * @return Config instance
+	 */
+	public Config getConfig() {
+		return config;
+	}
 
-    public int getMaxReconnectTries() {
-        return maxReconnectTries;
-    }
-
-    public int getReconnectMillis() {
-        return reconnectMillis;
-    }
-
-    public int getReconnectTimeout() {
-        return reconnectTimeout;
-    }
-
-    public String getShutdownMessage() {
-        return shutdownMessage;
-    }
-
-    public Pattern getShutdownPattern() {
-        return shutdownPattern;
-    }
+	/**
+	 * @return true if Protocolize API is loaded
+	 */
+	public boolean isProtocolizeLoaded() {
+		return isProtocolizeLoaded;
+	}
 
 }

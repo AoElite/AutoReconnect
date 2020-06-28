@@ -6,7 +6,7 @@
 
 	<groupId>me.aoelite.bungee</groupId>
 	<artifactId>AutoReconnect</artifactId>
-	<version>1.2</version>
+	<version>1.4</version>
 	<packaging>jar</packaging>
 
 	<name>AutoReconnect</name>
@@ -57,20 +57,36 @@
 			<id>sonatype-oss-repo</id>
 			<url>https://oss.sonatype.org/content/groups/public/</url>
 		</repository>
+		<repository>
+			<id>exceptionflug</id>
+			<url>https://mvn.exceptionflug.de/repository/exceptionflug-public/</url>
+		</repository>
 	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>net.md-5</groupId>
 			<artifactId>bungeecord-api</artifactId>
-			<version>1.15-SNAPSHOT</version>
+			<version>1.16-R0.1-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>net.md-5</groupId>
 			<artifactId>bungeecord</artifactId>
-			<version>1.15-SNAPSHOT</version>
+			<version>1.16-SNAPSHOT</version>
 			<scope>system</scope>
-			<systemPath>${project.basedir}/dependencies/BungeeCord.jar</systemPath>
+			<systemPath>${project.basedir}/dependencies/BungeeCord-1.16.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>de.exceptionflug</groupId>
+			<artifactId>protocolize-api</artifactId>
+			<version>1.5.5-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>de.exceptionflug</groupId>
+			<artifactId>protocolize-world</artifactId>
+			<version>1.5.5-SNAPSHOT</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 </project>

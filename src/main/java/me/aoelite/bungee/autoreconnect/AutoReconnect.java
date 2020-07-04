@@ -3,7 +3,6 @@ package me.aoelite.bungee.autoreconnect;
 import me.aoelite.bungee.autoreconnect.api.ServerReconnectEvent;
 import me.aoelite.bungee.autoreconnect.net.ReconnectBridge;
 import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
-import me.aoelite.bungee.autoreconnect.net.packets.PositionLookPacket;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
@@ -65,7 +64,7 @@ public final class AutoReconnect extends Plugin implements Listener {
 		getProxy().getPluginManager().registerListener(this, this);
 
 		try {
-			isProtocolizeLoaded = Class.forName("de.exceptionflug.protocolize.api.event.PacketReceiveEvent") != null;
+			isProtocolizeLoaded = Class.forName("de.exceptionflug.protocolize.api.protocol.AbstractPacket") != null;
 		} catch (ClassNotFoundException e) {
 			isProtocolizeLoaded = false;
 		}
@@ -199,7 +198,7 @@ public final class AutoReconnect extends Plugin implements Listener {
 	 *            The Server the User should be connected to.
 	 */
 	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
-		if (getConfig().getMoveToEmptyWorld() && isProtocolizeLoaded()) {
+		if (isProtocolizeLoaded() && getConfig().getMoveToEmptyWorld()) {
 			Object newDim;
 			String worldName = "";
 			if (user.getDimension() instanceof Integer) {
@@ -213,8 +212,8 @@ public final class AutoReconnect extends Plugin implements Listener {
 			user.setDimension(newDim);
 			user.unsafe().sendPacket((DefinedPacket) new Respawn(newDim, worldName, 0L,
 					(short) 0, (short) 0, (short) 0,
-					"default", false, true, false));
-			user.unsafe().sendPacket(new PositionLookPacket(0, 64, 0, 0f, 0f, (byte) 0, 0));
+					"default", false, false, false));
+			user.unsafe().sendPacket(PacketManager.getPositionLookPacket());
 		}
 		ReconnectTask reconnectTask = reconnectTasks.get(user.getUniqueId());
 		if (reconnectTask == null) {

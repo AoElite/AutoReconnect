@@ -70,8 +70,8 @@ public class ReconnectTask {
 			this.reconnectMessageUpdate = BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
 				@Override
 				public void run() {
-					if (instance.isUserOnline(user) && Objects.equals(user.getServer(), server)) {
-						updateMessages();
+					if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
+						updateStatusMessages();
 					} else {
 						if (reconnectMessageUpdate != null)
 							reconnectMessageUpdate.cancel();
@@ -80,7 +80,7 @@ public class ReconnectTask {
 			}, 0, instance.getConfig().getReconnectingSendInterval(), TimeUnit.MILLISECONDS);
 		} else {
 			reconnectMessageUpdate = null;
-			updateMessages();
+			updateStatusMessages();
 		}
 	}
 
@@ -89,9 +89,9 @@ public class ReconnectTask {
 	 * method will be executed again after a short timeout.
 	 */
 	public void tryReconnect() {
-		if (tries + 1 > instance.getConfig().getMaxReconnectTries()) {
+		if (++tries > instance.getConfig().getMaxReconnectTries()) {
 			// If we have reached the maximum reconnect limit, proceed BungeeCord-like.
-			instance.cancelReconnectTask(user.getUniqueId());
+			instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
 
 			// getFallbackServer()
 			ServerInfo def = user.updateAndGetNextServer(server.getInfo());
@@ -149,15 +149,16 @@ public class ReconnectTask {
 			tries++;
 		}
 
+		// If status messages are not sent periodically, send on reconnection attempt
 		if (instance.getConfig().getReconnectingSendInterval() <= 0)
-			updateMessages();
+			updateStatusMessages();
 
 		// Establish connection to the server.
 		ChannelInitializer<Channel> initializer = new BasicChannelInitializer(bungee, user, target);
 		ChannelFutureListener listener = future -> {
 			if (future.isSuccess() && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
 				// If reconnected successfully, remove from map and send another fancy title.
-				instance.cancelReconnectTask(user.getUniqueId());
+				instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
 				if (reconnectMessageUpdate != null)
 					reconnectMessageUpdate.cancel();
 				if (actionBarRefresh != null)
@@ -186,10 +187,10 @@ public class ReconnectTask {
 					public void run() {
 						// Only retry to reconnect the user if he is still online and hasn't been moved
 						// to another server.
-						if (instance.isUserOnline(user) && Objects.equals(user.getServer(), server)) {
+						if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
 							tryReconnect();
 						} else {
-							instance.cancelReconnectTask(user.getUniqueId());
+							instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
 						}
 					}
 				}, instance.getConfig().getReconnectTime(), TimeUnit.MILLISECONDS);
@@ -219,13 +220,14 @@ public class ReconnectTask {
 				future.channel().close();
 				user.getPendingConnects().remove((Object) target);
 				ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
-				if (request.isRetry() && def != null && (user.getServer() == null || def != user.getServer().getInfo())) {
+				if (request.isRetry() && def != null && (Objects.equals(user.getServer(), server) || def != user.getServer().getInfo())) {
 					user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
 					connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
 				} else {
 					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 						user.sendMessage(instance.getConfig().getLimboText());
-						instance.keepAlive(user.getUniqueId(), user);
+						instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
+						user.setServer(new LimboServer(instance));
 					} else {
 						user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
 					}
@@ -248,7 +250,7 @@ public class ReconnectTask {
 	/**
 	 * Send the current reconnecting messages to the user
 	 */
-	private void updateMessages() {
+	private void updateStatusMessages() {
 		// Increment number of dots to display
 		numDots++;
 		if (!instance.getConfig().getReconnectingChat().isEmpty())
@@ -263,7 +265,7 @@ public class ReconnectTask {
 				actionBarRefresh = BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
 					@Override
 					public void run() {
-						if (instance.isUserOnline(user) && Objects.equals(user.getServer(), server)) {
+						if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
 							user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getReconnectingActionBar().replace("{%server%}", server.getInfo().getName()).replace("{%dots%}", getDots())));
 						} else if (actionBarRefresh != null)
 							actionBarRefresh.cancel();
@@ -333,7 +335,7 @@ public class ReconnectTask {
 			reconnectMessageUpdate.cancel();
 		if (actionBarRefresh != null)
 			actionBarRefresh.cancel();
-		if (instance.isUserOnline(user)) {
+		if (instance.getReconnectHandler().isUserOnline(user)) {
 			if (!Strings.isNullOrEmpty(instance.getConfig().getReconnectingTitle()) || !Strings.isNullOrEmpty(instance.getConfig().getConnectingTitle()) || !Strings.isNullOrEmpty(instance.getConfig().getRejectedTitle()) || !Strings.isNullOrEmpty(instance.getConfig().getFailedTitle())) {
 				// For some reason, we have to reset and clear the title, so it completely
 				// disappears -> BungeeCord bug?

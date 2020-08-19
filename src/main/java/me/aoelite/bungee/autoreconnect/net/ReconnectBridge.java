@@ -55,7 +55,7 @@ public class ReconnectBridge extends DownstreamBridge {
 
 		// Fire ServerReconnectEvent and give plugins the possibility to cancel server
 		// reconnecting.
-		if (!instance.fireServerReconnectEvent(user, server)) {
+		if (!instance.getReconnectHandler().fireServerReconnectEvent(user, server)) {
 			// Invoke default behaviour if event has been cancelled.
 			ServerInfo def = user.updateAndGetNextServer((ServerInfo) this.server.getInfo());
 			if (def != null) {
@@ -73,7 +73,7 @@ public class ReconnectBridge extends DownstreamBridge {
 			}
 		} else {
 			// Otherwise, reconnect the User if he is still online.
-			instance.reconnectIfOnline(user, server, errorMessage);
+			instance.getReconnectHandler().reconnectIfOnline(user, server, errorMessage);
 		}
 	}
 
@@ -94,10 +94,9 @@ public class ReconnectBridge extends DownstreamBridge {
 			// doReconnect indicates whether the player should be reconnected or not after
 			// he has been kicked. Only if the kick reason matches the one that has been
 			// pre-defined on the config, we allow him to reconnect.
-			boolean doReconnect = false;
+			boolean doReconnect = true;
 			if (instance.getConfig().getShutdownMessage() != null) {
-				if (instance.getConfig().getShutdownMessage().equals(kickMessage))
-					doReconnect = true;
+				doReconnect = instance.getConfig().getShutdownMessage().equals(kickMessage);
 			} else if (instance.getConfig().getShutdownPattern() != null) {
 				try {
 					doReconnect = instance.getConfig().getShutdownPattern().matcher(kickMessage).matches();
@@ -108,13 +107,13 @@ public class ReconnectBridge extends DownstreamBridge {
 
 			// As always, we fire a ServerReconnectEvent and give plugins the possibility to
 			// cancel server reconnecting.
-			if (!doReconnect || !instance.fireServerReconnectEvent(user, server)) {
+			if (!doReconnect || !instance.getReconnectHandler().fireServerReconnectEvent(user, server)) {
 				// Invoke default behaviour if event has been cancelled and disconnect the
 				// player.
 				user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessageColor : instance.getConfig().getKickText().replace("{%reason%}", kickMessageColor).replace("{%server%}", server.getInfo().getName()));
 			} else {
 				// Otherwise, reconnect the User if he is still online.
-				instance.reconnectIfOnline(user, server, kickMessageColor);
+				instance.getReconnectHandler().reconnectIfOnline(user, server, kickMessageColor);
 			}
 		}
 		server.setObsolete(true);

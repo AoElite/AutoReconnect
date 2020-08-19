@@ -39,6 +39,7 @@ public class Config {
 	private String kickText = "Disconnected from {%server%}\\n{%reason%}";
 	private boolean moveToEmptyWorld = true;
 	private boolean doNotDisconnect = true;
+	private String limboServerName = "limbo";
 	private long delayBeforeTrying = 15000;
 	private int maxReconnectTries = 2;
 	private long reconnectTime = 1000;
@@ -261,6 +262,13 @@ public class Config {
 	 */
 	public boolean getDoNotDisconnect() {
 		return doNotDisconnect;
+	}
+	
+	/**
+	 * @return Name of virtual limbo server
+	 */
+	public String getLimboServerName() {
+		return limboServerName;
 	}
 
 	/**

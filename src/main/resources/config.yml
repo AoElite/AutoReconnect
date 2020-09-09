@@ -4,7 +4,7 @@
 # The current version of this configuration. Do NOT change this value!
 # If the plugin uses a more recent config version, this config gets replaced by it
 # while a backup of the old config will be kept as "config.old.yml".
-version: 4
+version: 5
 
 # The text that should be displayed, when the plugin is trying to reconnect a player.
 # Leave empty if you don't wish any title or action bar message to be displayed.
@@ -70,6 +70,10 @@ move-to-empty-world: true
 # If true and move-to-empty-world, above, is true, the player will be left in limbo instead
 # of being disconnected if reconnection fails.
 do-not-disconnect: true
+
+# If move-to-empty-world and do-not-disconnect are true, a virtual server will be created with the following name
+# that cannot be connected to, but will be used as the current server for players left in limbo.
+limbo-server-name: "limbo"
 
 # The amount of milliseconds the plugin should wait before attempting to check if the server is alive.
 delay-before-trying: 15000

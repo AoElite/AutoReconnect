@@ -6,7 +6,7 @@
 
 	<groupId>me.aoelite.bungee</groupId>
 	<artifactId>AutoReconnect</artifactId>
-	<version>1.5</version>
+	<version>1.6</version>
 	<packaging>jar</packaging>
 
 	<name>AutoReconnect</name>
@@ -66,7 +66,7 @@
 		<dependency>
 			<groupId>net.md-5</groupId>
 			<artifactId>bungeecord-api</artifactId>
-			<version>1.16-R0.1-SNAPSHOT</version>
+			<version>1.16-R0.4-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -79,7 +79,7 @@
 		<dependency>
 			<groupId>de.exceptionflug</groupId>
 			<artifactId>protocolize-api</artifactId>
-			<version>1.6.1-SNAPSHOT</version>
+			<version>1.6.2-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>

@@ -12,20 +12,15 @@ import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
-import net.md_5.bungee.protocol.DefinedPacket;
 import net.md_5.bungee.protocol.packet.BossBar;
 import net.md_5.bungee.protocol.packet.KeepAlive;
 import net.md_5.bungee.protocol.packet.Login;
 import net.md_5.bungee.protocol.packet.Respawn;
+import se.llbit.nbt.Tag;
 
 public class ReconnectHandler {
 
 	private final AutoReconnect autoReconnect;
-	
-	/**
-	 * Virtual limbo server instance.
-	 */
-	private final LimboServer limboServer;
 
 	/**
 	 * A HashMap containing all reconnect tasks.
@@ -41,7 +36,6 @@ public class ReconnectHandler {
 		this.autoReconnect = autoReconnect;
 		if (autoReconnect.getConfig().getMoveToEmptyWorld() && !autoReconnect.isProtocolizeLoaded()) {
 			autoReconnect.getLogger().severe("Protocolize is not installed! Unable to send reconnecting players to an empty world!");
-			limboServer = null;
 		} else if (autoReconnect.getConfig().getMoveToEmptyWorld() && autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getDoNotDisconnect()) {
 			// Schedule keep-alive packet every 5 seconds to keep players in limbo
 			BungeeCord.getInstance().getScheduler().schedule(autoReconnect, () -> {
@@ -53,9 +47,6 @@ public class ReconnectHandler {
 					return true;
 				});
 			}, 5, 5, TimeUnit.SECONDS);
-			limboServer = new LimboServer(autoReconnect);
-		} else {
-			limboServer = null;
 		}
 	}
 
@@ -118,17 +109,23 @@ public class ReconnectHandler {
 	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
 		if (autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
 			if (!(user.getDimension() instanceof Integer)) {
+				Object newDimension;
+				if (user.getDimension() instanceof Tag) {
+					newDimension = LimboDimensionType.getLimboCurrentDimension();
+				} else {
+					newDimension = LimboDimensionType.DIMENSION_NAME;
+				}
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
-						previousGamemode, new HashSet<String>(Arrays.asList("bungeecord:limbo")), LimboDimensionType.getLimboDimensionList(), LimboDimensionType.DIMENSION_NAME,
-						"bungeecord:limbo", 0, (short) 0, (short) 0, "", 10, false, false, false, false));
+						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), user.getDimension() instanceof Tag ? LimboDimensionType.getLimboLoginRegistry() : LimboDimensionType.getLimboLoginRegistryOld(), newDimension,
+						LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 0, "", 10, false, false, false, false));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();
 				for (UUID bossbar : user.getSentBossBars()) {
 					user.unsafe().sendPacket(new BossBar(bossbar, 1));
 				}
 				user.getSentBossBars().clear();
-				user.unsafe().sendPacket(new Respawn(LimboDimensionType.DIMENSION_NAME, "bungeecord:limbo", 0, (short) 0, (short) 2, previousGamemode, "", false, false, false));
+				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 2, previousGamemode, "", false, false, false));
 			} else {
 				Object newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
 				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, false));

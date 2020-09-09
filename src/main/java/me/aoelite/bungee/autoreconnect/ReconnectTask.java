@@ -13,9 +13,11 @@ import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.BungeeServerInfo;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
+import net.md_5.bungee.api.Callback;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.ServerConnectRequest;
+import net.md_5.bungee.api.ServerPing;
 import net.md_5.bungee.api.Title;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
@@ -92,7 +94,6 @@ public class ReconnectTask {
 		if (++tries > instance.getConfig().getMaxReconnectTries()) {
 			// If we have reached the maximum reconnect limit, proceed BungeeCord-like.
 			instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
-
 			// getFallbackServer()
 			ServerInfo def = user.updateAndGetNextServer(server.getInfo());
 			if (def != null) {
@@ -154,75 +155,128 @@ public class ReconnectTask {
 			updateStatusMessages();
 
 		// Establish connection to the server.
-		ChannelInitializer<Channel> initializer = new BasicChannelInitializer(bungee, user, target);
-		ChannelFutureListener listener = future -> {
-			if (future.isSuccess() && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
-				// If reconnected successfully, remove from map and send another fancy title.
-				instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
-				if (reconnectMessageUpdate != null)
-					reconnectMessageUpdate.cancel();
-				if (actionBarRefresh != null)
-					actionBarRefresh.cancel();
-
-				if (!instance.getConfig().getConnectingChat().isEmpty())
-					user.sendMessage(instance.getConfig().getConnectingChat().replace("{%server%}", server.getInfo().getName()));
-				if (!instance.getConfig().getConnectingActionBar().isEmpty())
-					user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getConnectingActionBar().replace("{%server%}", server.getInfo().getName())));
-				else
-					user.sendMessage(ChatMessageType.ACTION_BAR, EMPTY);
-				if (!instance.getConfig().getConnectingTitle().isEmpty())
-					createTitle(instance.getConfig().getConnectingTitle().replace("{%server%}", server.getInfo().getName())).send(user);
-				else
-					user.sendTitle(ProxyServer.getInstance().createTitle().reset());
-			} else {
-				future.channel().close();
-				user.getPendingConnects().remove(target);
-
-				// Send KeepAlive Packet so that the client won't time out.
-				user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
-
-				// Schedule next reconnect.
-				BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
-					@Override
-					public void run() {
-						// Only retry to reconnect the user if he is still online and hasn't been moved
-						// to another server.
-						if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
-							tryReconnect();
-						} else {
+		target.ping(new Callback<ServerPing>() {
+			@Override
+			public void done(ServerPing result, Throwable error) {
+				if (result != null && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
+					// If pinged successfully, attempt reconnection.
+					ChannelInitializer<Channel> initializer = new BasicChannelInitializer(bungee, user, target);
+					ChannelFutureListener listener = future -> {
+						if (future.isSuccess() && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
+							// If reconnected successfully, remove from map and send another fancy title.
 							instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
+							if (reconnectMessageUpdate != null)
+								reconnectMessageUpdate.cancel();
+							if (actionBarRefresh != null)
+								actionBarRefresh.cancel();
+
+							if (!instance.getConfig().getConnectingChat().isEmpty())
+								user.sendMessage(instance.getConfig().getConnectingChat().replace("{%server%}", server.getInfo().getName()));
+							if (!instance.getConfig().getConnectingActionBar().isEmpty())
+								user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getConnectingActionBar().replace("{%server%}", server.getInfo().getName())));
+							else
+								user.sendMessage(ChatMessageType.ACTION_BAR, EMPTY);
+							if (!instance.getConfig().getConnectingTitle().isEmpty())
+								createTitle(instance.getConfig().getConnectingTitle().replace("{%server%}", server.getInfo().getName())).send(user);
+							else
+								user.sendTitle(ProxyServer.getInstance().createTitle().reset());
+						} else {
+							future.channel().close();
+							user.getPendingConnects().remove(target);
+
+							// Send KeepAlive Packet so that the client won't time out.
+							user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
+
+							// Schedule next reconnect.
+							BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
+								@Override
+								public void run() {
+									// Only retry to reconnect the user if he is still online and hasn't been moved
+									// to another server.
+									if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
+										tryReconnect();
+									} else {
+										instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
+									}
+								}
+							}, instance.getConfig().getReconnectTime(), TimeUnit.MILLISECONDS);
 						}
+					};
+
+					// Create a new Netty Bootstrap that contains the ChannelInitializer and the
+					// ChannelFutureListener.
+					Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+
+					// Windows is bugged, multi homed users will just have to live with random
+					// connecting IPs
+					if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
+						b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
 					}
-				}, instance.getConfig().getReconnectTime(), TimeUnit.MILLISECONDS);
+					b.connect().addListener(listener);
+				} else {
+					user.getPendingConnects().remove(target);
+
+					// Send KeepAlive Packet so that the client won't time out.
+					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
+
+					// Schedule next reconnect.
+					BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
+						@Override
+						public void run() {
+							// Only retry to reconnect the user if he is still online and hasn't been moved
+							// to another server.
+							if (instance.getReconnectHandler().isUserOnline(user) && Objects.equals(user.getServer(), server)) {
+								tryReconnect();
+							} else {
+								instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
+							}
+						}
+					}, instance.getConfig().getReconnectTime(), TimeUnit.MILLISECONDS);
+				}
 			}
-		};
-
-		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
-		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(server.getCh().getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
-
-		// Windows is bugged, multi homed users will just have to live with random
-		// connecting IPs
-		if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
-			b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
-		}
-		b.connect().addListener(listener);
+		});
 	}
 
 	private void connect(BungeeServerInfo target, boolean retry, Reason reason) {
-		user.setDimensionChange(true);
-		ServerConnectRequest.Builder builder = ServerConnectRequest.builder().retry(retry).reason(reason).target(target);
-		ServerConnectRequest request = builder.build();
-		user.getPendingConnects().add((ServerInfo) target);
-		BasicChannelInitializer initializer = new BasicChannelInitializer(bungee, user, target);
-		ChannelFutureListener listener = future -> {
-			if (!future.isSuccess()) {
-				future.channel().close();
-				user.getPendingConnects().remove((Object) target);
-				ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
-				if (request.isRetry() && def != null && (Objects.equals(user.getServer(), server) || def != user.getServer().getInfo())) {
-					user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
-					connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
+		target.ping(new Callback<ServerPing>() {
+			@Override
+			public void done(ServerPing result, Throwable error) {
+				if (result != null) {
+					user.setDimensionChange(true);
+					ServerConnectRequest.Builder builder = ServerConnectRequest.builder().retry(retry).reason(reason).target(target);
+					ServerConnectRequest request = builder.build();
+					user.getPendingConnects().add((ServerInfo) target);
+					BasicChannelInitializer initializer = new BasicChannelInitializer(bungee, user, target);
+					ChannelFutureListener listener = future -> {
+						if (!future.isSuccess()) {
+							future.channel().close();
+							user.getPendingConnects().remove((Object) target);
+							ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
+							if (request.isRetry() && def != null && (Objects.equals(user.getServer(), server) || def != user.getServer().getInfo())) {
+								user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
+								connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
+							} else {
+								if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
+									user.sendMessage(instance.getConfig().getLimboText());
+									instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
+									user.setServer(new LimboServer(instance));
+								} else {
+									user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
+								}
+							}
+						}
+					};
+
+					// Create a new Netty Bootstrap that contains the ChannelInitializer and the
+					// ChannelFutureListener.
+					Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
+
+					// Windows is bugged, multi homed users will just have to live with random
+					// connecting IPs
+					if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
+						b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
+					}
+					b.connect().addListener(listener);
 				} else {
 					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 						user.sendMessage(instance.getConfig().getLimboText());
@@ -233,18 +287,7 @@ public class ReconnectTask {
 					}
 				}
 			}
-		};
-
-		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
-		// ChannelFutureListener.
-		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
-
-		// Windows is bugged, multi homed users will just have to live with random
-		// connecting IPs
-		if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
-			b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
-		}
-		b.connect().addListener(listener);
+		});
 	}
 
 	/**

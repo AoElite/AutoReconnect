@@ -110,13 +110,14 @@ public class ReconnectHandler {
 		if (autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
 			if (!(user.getDimension() instanceof Integer)) {
 				Object newDimension;
-				if (user.getDimension() instanceof Tag)
-					newDimension = LimboDimensionType.DIMENSION_TAG;
-				else
+				if (user.getDimension() instanceof Tag) {
+					newDimension = LimboDimensionType.getLimboCurrentDimension();
+				} else {
 					newDimension = LimboDimensionType.DIMENSION_NAME;
+				}
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
-						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboDimensionList(), newDimension,
+						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), user.getDimension() instanceof Tag ? LimboDimensionType.getLimboLoginRegistry() : LimboDimensionType.getLimboLoginRegistryOld(), newDimension,
 						LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 0, "", 10, false, false, false, false));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();

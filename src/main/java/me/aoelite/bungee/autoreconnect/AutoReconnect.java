@@ -34,6 +34,9 @@ public final class AutoReconnect extends Plugin {
 		
 		// load Configuration
 		config = new Config(this);
+		
+		if (config.isDebugEnabled())
+			getLogger().severe("Debug output is enabled!");
 
 		// load dependency support
 		try {

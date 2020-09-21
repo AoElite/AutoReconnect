@@ -89,6 +89,8 @@ public class ReconnectHandler {
 	 *            The Server the User should be connected to.
 	 */
 	public void reconnectIfOnline(UserConnection user, ServerConnection server, String kickMessage) {
+		if (autoReconnect.getConfig().isDebugEnabled())
+			autoReconnect.getLogger().info("Attempting to reconnect user " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName() + " because of kick: " + kickMessage);
 		if (isUserOnline(user)) {
 			if (!isReconnecting(user.getUniqueId())) {
 				reconnect(user, server, kickMessage);
@@ -107,13 +109,23 @@ public class ReconnectHandler {
 	 *            The Server the User should be connected to.
 	 */
 	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
+		if (autoReconnect.getConfig().isDebugEnabled())
+			autoReconnect.getLogger().info("Reconnecting user " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName() + " because of kick: " + kickMessage);
 		if (autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
+			if (autoReconnect.getConfig().isDebugEnabled())
+				autoReconnect.getLogger().info("Attempting to move to limbo");
 			if (!(user.getDimension() instanceof Integer)) {
+				if (autoReconnect.getConfig().isDebugEnabled())
+					autoReconnect.getLogger().info("Version 1.16 or greater");
 				Object newDimension;
 				if (user.getDimension() instanceof Tag) {
 					newDimension = LimboDimensionType.getLimboCurrentDimension();
+					if (autoReconnect.getConfig().isDebugEnabled())
+						autoReconnect.getLogger().info("Version 1.16.2 or greater");
 				} else {
 					newDimension = LimboDimensionType.DIMENSION_NAME;
+					if (autoReconnect.getConfig().isDebugEnabled())
+						autoReconnect.getLogger().info("Version 1.16/1.16.1");
 				}
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
@@ -127,6 +139,8 @@ public class ReconnectHandler {
 				user.getSentBossBars().clear();
 				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 2, previousGamemode, "", false, false, false));
 			} else {
+				if (autoReconnect.getConfig().isDebugEnabled())
+					autoReconnect.getLogger().info("Version pre-1.16");
 				Object newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
 				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, false));
 				user.setGamemode(2);
@@ -143,7 +157,7 @@ public class ReconnectHandler {
 		if (reconnectTask == null) {
 			reconnectTasks.put(user.getUniqueId(), reconnectTask = new ReconnectTask(autoReconnect, autoReconnect.getProxy(), user, server, kickMessage));
 		}
-		reconnectTask.tryReconnect();
+		reconnectTask.startReconnect();
 	}
 
 	/**
@@ -153,6 +167,8 @@ public class ReconnectHandler {
 	 *            The UniqueId of the User.
 	 */
 	void cancelReconnectTask(UUID uuid) {
+		if (autoReconnect.getConfig().isDebugEnabled())
+			autoReconnect.getLogger().info("Cancelling reconnect task for " + uuid);
 		ReconnectTask task = reconnectTasks.remove(uuid);
 		if (task != null && autoReconnect.getProxy().getPlayer(uuid) != null) {
 			task.cancel();
@@ -180,6 +196,8 @@ public class ReconnectHandler {
 	 *            The user instance
 	 */
 	void keepAlive(UUID uuid, UserConnection user) {
+		if (autoReconnect.getConfig().isDebugEnabled())
+			autoReconnect.getLogger().info("Keeping user connection alive " + user.getDisplayName() + " (" + uuid + ")");
 		keepAliveUsers.put(uuid, user);
 	}
 
@@ -190,6 +208,8 @@ public class ReconnectHandler {
 	 *            The UniqueId of the User.
 	 */
 	void cancelKeepAlive(UUID uuid) {
+		if (autoReconnect.getConfig().isDebugEnabled())
+			autoReconnect.getLogger().info("No longer keeping user connection alive " + uuid);
 		keepAliveUsers.remove(uuid);
 	}
 

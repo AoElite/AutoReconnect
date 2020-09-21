@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.util.internal.PlatformDependent;
@@ -17,7 +18,6 @@ import net.md_5.bungee.api.Callback;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.ServerConnectRequest;
-import net.md_5.bungee.api.ServerPing;
 import net.md_5.bungee.api.Title;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
@@ -85,18 +85,39 @@ public class ReconnectTask {
 			updateStatusMessages();
 		}
 	}
+	
+	public void startReconnect() {
+		if (!instance.getConfig().getReconnectingChat().isEmpty())
+			user.sendMessage(instance.getConfig().getReconnectingChat().replace("{%server%}", server.getInfo().getName()));
+		if (reconnectMessageUpdate == null)
+			updateStatusMessages();
+		BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
+			@Override
+			public void run() {
+				tryReconnect();
+			}
+		}, instance.getConfig().getDelayBeforeTrying(), TimeUnit.MILLISECONDS);
+	}
 
 	/**
 	 * Tries to reconnect the User to the specified Server. In case that fails, this
 	 * method will be executed again after a short timeout.
 	 */
 	public void tryReconnect() {
+		if (instance.getConfig().isDebugEnabled())
+			instance.getLogger().info("Reconnect attempt " + (tries + 1) + " for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
+		// Send KeepAlive Packet so that the client won't time out.
+		user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 		if (++tries > instance.getConfig().getMaxReconnectTries()) {
+			if (instance.getConfig().isDebugEnabled())
+				instance.getLogger().info("Max tries reached for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 			// If we have reached the maximum reconnect limit, proceed BungeeCord-like.
 			instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
 			// getFallbackServer()
 			ServerInfo def = user.updateAndGetNextServer(server.getInfo());
 			if (def != null) {
+				if (instance.getConfig().isDebugEnabled())
+					instance.getLogger().info("Sending " + user.getDisplayName() + " (" + user.getUUID() + ") to fallback server " + def.getName());
 				// If the fallback-server is not the same server we tried to reconnect to, send
 				// the user to that one instead.
 				server.setObsolete(true);
@@ -115,6 +136,8 @@ public class ReconnectTask {
 				else
 					user.sendTitle(ProxyServer.getInstance().createTitle().reset());
 			} else {
+				if (instance.getConfig().isDebugEnabled())
+					instance.getLogger().info("No fallback server for " + user.getDisplayName() + " (" + user.getUUID() + ")");
 				// Otherwise, disconnect the user with a "Lost Connection"-message.
 				// If do-not-disconnect is set to true in config, and the player can enter
 				// limbo, they will be left in limbo instead
@@ -151,18 +174,28 @@ public class ReconnectTask {
 		}
 
 		// If status messages are not sent periodically, send on reconnection attempt
-		if (instance.getConfig().getReconnectingSendInterval() <= 0)
+		if (reconnectMessageUpdate == null)
 			updateStatusMessages();
 
 		// Establish connection to the server.
-		target.ping(new Callback<ServerPing>() {
+		if (instance.getConfig().isDebugEnabled())
+			instance.getLogger().info("Attempting to ping server for " + user.getDisplayName() + " (" + user.getUUID() + ") to connect to " + server.getInfo().getName());
+		ping(target, new Callback<Boolean>() {
 			@Override
-			public void done(ServerPing result, Throwable error) {
-				if (result != null && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
+			public void done(Boolean result, Throwable error) {
+				if (instance.getConfig().isDebugEnabled())
+					instance.getLogger().info("Pinged server for " + user.getDisplayName() + " (" + user.getUUID() + ") to connect to " + server.getInfo().getName() + " Result: " + (result ? "Available" : "Unavailable"));
+				if (result) {
+					if (instance.getConfig().isDebugEnabled())
+						instance.getLogger().info("Will connect " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
+					// Send KeepAlive Packet so that the client won't time out.
+					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 					// If pinged successfully, attempt reconnection.
 					ChannelInitializer<Channel> initializer = new BasicChannelInitializer(bungee, user, target);
 					ChannelFutureListener listener = future -> {
-						if (future.isSuccess() && startTime + instance.getConfig().getDelayBeforeTrying() <= System.currentTimeMillis()) {
+						if (future.isSuccess()) {
+							if (instance.getConfig().isDebugEnabled())
+								instance.getLogger().info("Connection successful for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 							// If reconnected successfully, remove from map and send another fancy title.
 							instance.getReconnectHandler().cancelReconnectTask(user.getUniqueId());
 							if (reconnectMessageUpdate != null)
@@ -181,6 +214,8 @@ public class ReconnectTask {
 							else
 								user.sendTitle(ProxyServer.getInstance().createTitle().reset());
 						} else {
+							if (instance.getConfig().isDebugEnabled())
+								instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 							future.channel().close();
 							user.getPendingConnects().remove(target);
 
@@ -212,8 +247,12 @@ public class ReconnectTask {
 					if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
 						b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
 					}
+					if (instance.getConfig().isDebugEnabled())
+						instance.getLogger().info("Attempting to connect " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 					b.connect().addListener(listener);
 				} else {
+					if (instance.getConfig().isDebugEnabled())
+						instance.getLogger().info("Will not attempt to connect " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 					user.getPendingConnects().remove(target);
 
 					// Send KeepAlive Packet so that the client won't time out.
@@ -236,48 +275,37 @@ public class ReconnectTask {
 			}
 		});
 	}
+	
+	private void ping(BungeeServerInfo target, Callback<Boolean> callback) {
+		if (instance.getConfig().isDebugEnabled())
+			instance.getLogger().info("Pinging for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName());
+		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(BungeeCord.getInstance().workerEventLoopGroup).handler((ChannelHandler) PipelineUtils.BASE).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+		b.connect().addListener(future -> callback.done(future.isSuccess(), future.cause()));
+	}
 
 	private void connect(BungeeServerInfo target, boolean retry, Reason reason) {
-		target.ping(new Callback<ServerPing>() {
-			@Override
-			public void done(ServerPing result, Throwable error) {
-				if (result != null) {
-					user.setDimensionChange(true);
-					ServerConnectRequest.Builder builder = ServerConnectRequest.builder().retry(retry).reason(reason).target(target);
-					ServerConnectRequest request = builder.build();
-					user.getPendingConnects().add((ServerInfo) target);
-					BasicChannelInitializer initializer = new BasicChannelInitializer(bungee, user, target);
-					ChannelFutureListener listener = future -> {
-						if (!future.isSuccess()) {
-							future.channel().close();
-							user.getPendingConnects().remove((Object) target);
-							ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
-							if (request.isRetry() && def != null && (Objects.equals(user.getServer(), server) || def != user.getServer().getInfo())) {
-								user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
-								connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
-							} else {
-								if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
-									user.sendMessage(instance.getConfig().getLimboText());
-									instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
-									user.setServer(new LimboServer(instance));
-								} else {
-									user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
-								}
-							}
-						}
-					};
-
-					// Create a new Netty Bootstrap that contains the ChannelInitializer and the
-					// ChannelFutureListener.
-					Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
-
-					// Windows is bugged, multi homed users will just have to live with random
-					// connecting IPs
-					if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
-						b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
-					}
-					b.connect().addListener(listener);
+		if (instance.getConfig().isDebugEnabled())
+			instance.getLogger().info("Connecting " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName());
+		user.setDimensionChange(true);
+		ServerConnectRequest.Builder builder = ServerConnectRequest.builder().retry(retry).reason(reason).target(target);
+		ServerConnectRequest request = builder.build();
+		user.getPendingConnects().add((ServerInfo) target);
+		BasicChannelInitializer initializer = new BasicChannelInitializer(bungee, user, target);
+		ChannelFutureListener listener = future -> {
+			if (!future.isSuccess()) {
+				future.channel().close();
+				user.getPendingConnects().remove((Object) target);
+				ServerInfo def = user.updateAndGetNextServer((ServerInfo) target);
+				if (request.isRetry() && def != null && (Objects.equals(user.getServer(), server) || def != user.getServer().getInfo())) {
+					if (instance.getConfig().isDebugEnabled())
+						instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName() + " Will connect to fallback");
+					user.sendMessage(bungee.getTranslation("fallback_lobby", new Object[0]));
+					connect((BungeeServerInfo) def, true, ServerConnectEvent.Reason.LOBBY_FALLBACK);
 				} else {
+					if (instance.getConfig().isDebugEnabled())
+						instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName() + " Will leave in limbo or disconnect if unavailable");
+					// Send KeepAlive Packet so that the client won't time out.
+					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 						user.sendMessage(instance.getConfig().getLimboText());
 						instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
@@ -287,7 +315,18 @@ public class ReconnectTask {
 					}
 				}
 			}
-		});
+		};
+
+		// Create a new Netty Bootstrap that contains the ChannelInitializer and the
+		// ChannelFutureListener.
+		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(Util.getUserChannelWrapper(user).getHandle().eventLoop()).handler(initializer).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout()).remoteAddress(target.getAddress());
+
+		// Windows is bugged, multi homed users will just have to live with random
+		// connecting IPs
+		if (user.getPendingConnection().getListener().isSetLocalAddress() && !PlatformDependent.isWindows()) {
+			b.localAddress(((InetSocketAddress) user.getPendingConnection().getListener().getSocketAddress()).getHostString(), 0);
+		}
+		b.connect().addListener(listener);
 	}
 
 	/**
@@ -296,8 +335,6 @@ public class ReconnectTask {
 	private void updateStatusMessages() {
 		// Increment number of dots to display
 		numDots++;
-		if (!instance.getConfig().getReconnectingChat().isEmpty())
-			user.sendMessage(instance.getConfig().getReconnectingChat().replace("{%server%}", server.getInfo().getName()).replace("{%dots%}", getDots()));
 		if (!instance.getConfig().getReconnectingActionBar().isEmpty()) {
 			user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getReconnectingActionBar().replace("{%server%}", server.getInfo().getName()).replace("{%dots%}", getDots())));
 			if (instance.getConfig().getReconnectingSendInterval() > 1000) {

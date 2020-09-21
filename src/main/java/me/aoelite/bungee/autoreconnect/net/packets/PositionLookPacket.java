@@ -200,5 +200,6 @@ public class PositionLookPacket extends AbstractPacket {
 		MAPPING.put(735, 0x35);
 		MAPPING.put(736, 0x35);
 		MAPPING.put(751, 0x34);
+		MAPPING.put(753, 0x34);
 	}
 }

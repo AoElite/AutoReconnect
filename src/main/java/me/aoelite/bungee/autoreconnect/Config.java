@@ -47,6 +47,7 @@ public class Config {
 	private List<String> ignoredServers = new ArrayList<>();
 	private String shutdownMessage = "Server closed";
 	private Pattern shutdownPattern = null;
+	private boolean debug = false;
 
 	/**
 	 * Config instance that holds all config info
@@ -119,6 +120,7 @@ public class Config {
 						instance.getLogger().warning("Could not compile shutdown regex! Please check your config! Using default shutdown message...");
 					}
 				}
+				debug = configuration.getBoolean("debug", debug);
 			} else {
 				saveDefaultConfig(configFile);
 			}
@@ -318,6 +320,13 @@ public class Config {
 	 */
 	public Pattern getShutdownPattern() {
 		return shutdownPattern;
+	}
+	
+	/**
+	 * @return True if debug messages should be outputted
+	 */
+	public boolean isDebugEnabled() {
+		return debug;
 	}
 
 }

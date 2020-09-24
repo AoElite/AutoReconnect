@@ -34,20 +34,16 @@ public class ReconnectHandler {
 
 	protected ReconnectHandler(AutoReconnect autoReconnect) {
 		this.autoReconnect = autoReconnect;
-		if (autoReconnect.getConfig().getMoveToEmptyWorld() && !autoReconnect.isProtocolizeLoaded()) {
-			autoReconnect.getLogger().severe("Protocolize is not installed! Unable to send reconnecting players to an empty world!");
-		} else if (autoReconnect.getConfig().getMoveToEmptyWorld() && autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getDoNotDisconnect()) {
-			// Schedule keep-alive packet every 5 seconds to keep players in limbo
-			BungeeCord.getInstance().getScheduler().schedule(autoReconnect, () -> {
-				keepAliveUsers.entrySet().removeIf(entry -> {
-					if (isUserOnline(entry.getValue())) {
-						entry.getValue().unsafe().sendPacket(new KeepAlive(AutoReconnect.RANDOM.nextInt()));
-						return false;
-					}
-					return true;
-				});
-			}, 5, 5, TimeUnit.SECONDS);
-		}
+		// Schedule keep-alive packet every 5 seconds to keep players in limbo
+		BungeeCord.getInstance().getScheduler().schedule(autoReconnect, () -> {
+			keepAliveUsers.entrySet().removeIf(entry -> {
+				if (isUserOnline(entry.getValue())) {
+					entry.getValue().unsafe().sendPacket(new KeepAlive(AutoReconnect.RANDOM.nextInt()));
+					return false;
+				}
+				return true;
+			});
+		}, 5, 5, TimeUnit.SECONDS);
 	}
 
 	/**

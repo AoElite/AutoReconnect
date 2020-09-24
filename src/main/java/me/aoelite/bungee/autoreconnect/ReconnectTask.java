@@ -25,20 +25,17 @@ import net.md_5.bungee.api.event.ServerConnectEvent;
 import net.md_5.bungee.api.event.ServerConnectEvent.Reason;
 import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.netty.PipelineUtils;
-import net.md_5.bungee.protocol.packet.KeepAlive;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class ReconnectTask {
 
-	private static final Random RANDOM = new Random();
 	private static final TextComponent EMPTY = new TextComponent("");
 
 	private static boolean oldPipelineUtils = false;
@@ -87,6 +84,7 @@ public class ReconnectTask {
 	}
 	
 	public void startReconnect() {
+		instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
 		if (!instance.getConfig().getReconnectingChat().isEmpty())
 			user.sendMessage(instance.getConfig().getReconnectingChat().replace("{%server%}", server.getInfo().getName()));
 		if (reconnectMessageUpdate == null)
@@ -106,8 +104,6 @@ public class ReconnectTask {
 	public void tryReconnect() {
 		if (instance.getConfig().isDebugEnabled())
 			instance.getLogger().info("Reconnect attempt " + (tries + 1) + " for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
-		// Send KeepAlive Packet so that the client won't time out.
-		user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 		if (++tries > instance.getConfig().getMaxReconnectTries()) {
 			if (instance.getConfig().isDebugEnabled())
 				instance.getLogger().info("Max tries reached for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
@@ -188,8 +184,6 @@ public class ReconnectTask {
 				if (result) {
 					if (instance.getConfig().isDebugEnabled())
 						instance.getLogger().info("Will connect " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
-					// Send KeepAlive Packet so that the client won't time out.
-					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 					// If pinged successfully, attempt reconnection.
 					ChannelInitializer<Channel> initializer = new BasicChannelInitializer(bungee, user, target);
 					ChannelFutureListener listener = future -> {
@@ -218,9 +212,6 @@ public class ReconnectTask {
 								instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 							future.channel().close();
 							user.getPendingConnects().remove(target);
-
-							// Send KeepAlive Packet so that the client won't time out.
-							user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 
 							// Schedule next reconnect.
 							BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
@@ -254,9 +245,6 @@ public class ReconnectTask {
 					if (instance.getConfig().isDebugEnabled())
 						instance.getLogger().info("Will not attempt to connect " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName());
 					user.getPendingConnects().remove(target);
-
-					// Send KeepAlive Packet so that the client won't time out.
-					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 
 					// Schedule next reconnect.
 					BungeeCord.getInstance().getScheduler().schedule(instance, new Runnable() {
@@ -304,11 +292,8 @@ public class ReconnectTask {
 				} else {
 					if (instance.getConfig().isDebugEnabled())
 						instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName() + " Will leave in limbo or disconnect if unavailable");
-					// Send KeepAlive Packet so that the client won't time out.
-					user.unsafe().sendPacket(new KeepAlive(RANDOM.nextInt()));
 					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 						user.sendMessage(instance.getConfig().getLimboText());
-						instance.getReconnectHandler().keepAlive(user.getUniqueId(), user);
 						user.setServer(new LimboServer(instance));
 					} else {
 						user.disconnect(instance.getConfig().getKickText().isEmpty() ? kickMessage : instance.getConfig().getKickText().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));

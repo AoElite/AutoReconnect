@@ -7,6 +7,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.util.internal.PlatformDependent;
 import me.aoelite.bungee.autoreconnect.net.BasicChannelInitializer;
 import me.aoelite.bungee.autoreconnect.net.packets.util.Util;
@@ -26,6 +27,7 @@ import net.md_5.bungee.api.event.ServerConnectEvent.Reason;
 import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.netty.PipelineUtils;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -38,8 +40,10 @@ public class ReconnectTask {
 
 	private static final TextComponent EMPTY = new TextComponent("");
 
-	private static boolean oldPipelineUtils = false;
+	protected static boolean oldPipelineUtils = false;
 	private static Method getPipelineChannel = null;
+	protected static boolean oldEventGroups = false;
+	private static Field eventGroupsField = null;
 
 	private final AutoReconnect instance;
 	private final ProxyServer bungee;
@@ -267,7 +271,7 @@ public class ReconnectTask {
 	private void ping(BungeeServerInfo target, Callback<Boolean> callback) {
 		if (instance.getConfig().isDebugEnabled())
 			instance.getLogger().info("Pinging for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName());
-		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(BungeeCord.getInstance().workerEventLoopGroup).handler((ChannelHandler) PipelineUtils.BASE).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
+		Bootstrap b = new Bootstrap().channel(getChannel(target.getAddress())).group(getEventLoopGroup()).handler((ChannelHandler) PipelineUtils.BASE).option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) instance.getConfig().getReconnectTimeout()).remoteAddress(target.getAddress());
 		b.connect().addListener(future -> callback.done(future.isSuccess(), future.cause()));
 	}
 
@@ -422,6 +426,18 @@ public class ReconnectTask {
 		return null;
 	}
 	
+	private EventLoopGroup getEventLoopGroup() {
+		if (!oldEventGroups)
+			return BungeeCord.getInstance().eventLoops;
+		else
+			try {
+				return (EventLoopGroup) eventGroupsField.get(BungeeCord.getInstance());
+			} catch (ClassCastException | IllegalAccessException | IllegalArgumentException e) {
+				e.printStackTrace();
+			}
+		return null;
+	}
+	
 	protected static void init() {
 		try {
 			PipelineUtils.class.getMethod("getChannel", SocketAddress.class);
@@ -429,11 +445,25 @@ public class ReconnectTask {
 			oldPipelineUtils = true;
 		}
 		if (oldPipelineUtils) {
-			Logger.getLogger("AutoReconnect").info("Detected old BungeeCord build! Using compatibility mode!");
+			Logger.getLogger("AutoReconnect").info("Detected old BungeeCord build! Using compatibility mode for socket channel!");
 			try {
 				getPipelineChannel = PipelineUtils.class.getMethod("getChannel");
 				getPipelineChannel.setAccessible(true);
 			} catch (NoSuchMethodException | SecurityException e) {
+				e.printStackTrace();
+			}
+		}
+		try {
+			BungeeCord.class.getField("eventLoops");
+		} catch (NoSuchFieldException | SecurityException e) {
+			oldEventGroups = true;
+		}
+		if (oldEventGroups) {
+			Logger.getLogger("AutoReconnect").info("Detected old BungeeCord build! Using compatibility mode for event loop group!");
+			try {
+				eventGroupsField = BungeeCord.class.getField("workerEventLoopGroup");
+				eventGroupsField.setAccessible(true);
+			} catch (NoSuchFieldException | SecurityException e) {
 				e.printStackTrace();
 			}
 		}

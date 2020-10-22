@@ -4,6 +4,8 @@ import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import net.md_5.bungee.api.plugin.Plugin;
 import java.util.Random;
 
+import org.bstats.bungeecord.Metrics;
+
 public final class AutoReconnect extends Plugin {
 
 	/**
@@ -25,6 +27,11 @@ public final class AutoReconnect extends Plugin {
 	 * Whether or not the Protocolize plugin is loaded
 	 */
 	private static boolean isProtocolizeLoaded = false;
+	
+	/**
+	 * bStats instance
+	 */
+	private Metrics metrics;
 
 	@Override
 	public void onEnable() {
@@ -52,6 +59,12 @@ public final class AutoReconnect extends Plugin {
 
 		// Initialize reflection if necessary
 		ReconnectTask.init();
+		
+		// Initialize bStats
+		metrics = new Metrics(this, 9174);
+		// Add custom charts
+		metrics.addCustomChart(new Metrics.SimplePie("old_pipeline_utils", () -> ReconnectTask.oldPipelineUtils ? "Enabled" : "Disabled"));
+		metrics.addCustomChart(new Metrics.SimplePie("old_event_groups", () -> ReconnectTask.oldEventGroups ? "Enabled" : "Disabled"));
 	}
 
 	@Override

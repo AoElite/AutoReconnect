@@ -11,7 +11,7 @@ public class PacketManager {
 	}
 	
 	public static DefinedPacket getPositionLookPacket() {
-		return new PositionLookPacket(0, 0, 0, 0f, 0f, (byte) 0, 0);
+		return new PositionLookPacket();
 	}
 
 }

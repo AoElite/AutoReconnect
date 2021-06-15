@@ -12,11 +12,11 @@ import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
+import net.md_5.bungee.protocol.ProtocolConstants;
 import net.md_5.bungee.protocol.packet.BossBar;
 import net.md_5.bungee.protocol.packet.KeepAlive;
 import net.md_5.bungee.protocol.packet.Login;
 import net.md_5.bungee.protocol.packet.Respawn;
-import se.llbit.nbt.Tag;
 
 public class ReconnectHandler {
 
@@ -110,22 +110,24 @@ public class ReconnectHandler {
 		if (autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
 			if (autoReconnect.getConfig().isDebugEnabled())
 				autoReconnect.getLogger().info("Attempting to move to limbo");
-			if (!(user.getDimension() instanceof Integer)) {
+			int version = UserVersionCache.getPlayerProtocolVersion(user.getUniqueId());
+			if (version >= ProtocolConstants.MINECRAFT_1_16) {
 				if (autoReconnect.getConfig().isDebugEnabled())
 					autoReconnect.getLogger().info("Version 1.16 or greater");
-				Object newDimension;
-				if (user.getDimension() instanceof Tag) {
-					newDimension = LimboDimensionType.getLimboCurrentDimension();
+				Object newDimension = LimboDimensionType.getLimboCurrentDimension(version);
+				if (version >= ProtocolConstants.MINECRAFT_1_17) {
 					if (autoReconnect.getConfig().isDebugEnabled())
-						autoReconnect.getLogger().info("Version 1.16.2 or greater");
+						autoReconnect.getLogger().info("Version 1.17 or greater");
+				} else if (version >= ProtocolConstants.MINECRAFT_1_16_2) {
+					if (autoReconnect.getConfig().isDebugEnabled())
+						autoReconnect.getLogger().info("Version 1.16.2-.5");
 				} else {
-					newDimension = LimboDimensionType.DIMENSION_NAME;
 					if (autoReconnect.getConfig().isDebugEnabled())
 						autoReconnect.getLogger().info("Version 1.16/1.16.1");
 				}
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
-						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), user.getDimension() instanceof Tag ? LimboDimensionType.getLimboLoginRegistry() : LimboDimensionType.getLimboLoginRegistryOld(), newDimension,
+						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(version), newDimension,
 						LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 0, "", 10, false, false, false, false));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();

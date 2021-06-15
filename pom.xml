@@ -58,6 +58,28 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>com.coderplus.maven.plugins</groupId>
+				<artifactId>copy-rename-maven-plugin</artifactId>
+				<version>1.0</version>
+				<executions>
+					<execution>
+						<id>copy-file</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy</goal>
+						</goals>
+						<configuration>
+							<fileSets>
+								<fileSet>
+									<sourceFile>target/${project.artifactId}-${project.version}.jar</sourceFile>
+									<destinationFile>artifacts/${project.artifactId}-${project.version}.jar</destinationFile>
+								</fileSet>
+							</fileSets>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 		<resources>
 			<resource>

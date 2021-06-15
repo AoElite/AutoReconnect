@@ -18,6 +18,7 @@ public class PositionLookPacket extends AbstractPacket {
 	private float pitch;
 	private byte flags;
 	private int teleportId;
+	private boolean dismountVehicle;
 
 	public void read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion) {
 		x = buf.readDouble();
@@ -28,6 +29,8 @@ public class PositionLookPacket extends AbstractPacket {
 		flags = buf.readByte();
 		if (protocolVersion >= 79)
 			teleportId = PositionLookPacket.readVarInt(buf);
+		if (protocolVersion >= 755)
+			dismountVehicle = buf.readBoolean();
 	}
 
 	public void write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion) {
@@ -39,6 +42,8 @@ public class PositionLookPacket extends AbstractPacket {
 		buf.writeByte(flags);
 		if (protocolVersion >= 79)
 			PositionLookPacket.writeVarInt(teleportId, buf);
+		if (protocolVersion >= 755)
+			buf.writeBoolean(dismountVehicle);
 	}
 
 	public double getX() {
@@ -96,9 +101,17 @@ public class PositionLookPacket extends AbstractPacket {
 	public void setTeleportId(int teleportId) {
 		this.teleportId = teleportId;
 	}
+	
+	public boolean getDismountVehicle() {
+		return dismountVehicle;
+	}
+	
+	public void setDismountVehicle(boolean dismountVehicle) {
+		this.dismountVehicle = dismountVehicle;
+	}
 
 	public String toString() {
-		return "PositionLookPacket(x=" + getX() + ", y=" + getY() + ", z=" + getZ() + ", yaw=" + getYaw() + ", pitch=" + getPitch() + ", flags=" + getFlags() + ", teleportId=" + getTeleportId() + ")";
+		return "PositionLookPacket(x=" + getX() + ", y=" + getY() + ", z=" + getZ() + ", yaw=" + getYaw() + ", pitch=" + getPitch() + ", flags=" + getFlags() + ", teleportId=" + getTeleportId() + ", dismountVehicle=" + getDismountVehicle() + ")";
 	}
 	
 	public PositionLookPacket() {
@@ -109,9 +122,10 @@ public class PositionLookPacket extends AbstractPacket {
 		this.pitch = 0;
 		this.flags = (byte) 0;
 		this.teleportId = 0;
+		this.dismountVehicle = false;
 	}
 
-	public PositionLookPacket(double x, double y, double z, float yaw, float pitch, byte flags, int teleportId) {
+	public PositionLookPacket(double x, double y, double z, float yaw, float pitch, byte flags, int teleportId, boolean dismountVehicle) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
@@ -119,9 +133,10 @@ public class PositionLookPacket extends AbstractPacket {
 		this.pitch = pitch;
 		this.flags = flags;
 		this.teleportId = teleportId;
+		this.dismountVehicle = dismountVehicle;
 	}
 
-	public PositionLookPacket(Location loc, byte flags, int teleportId) {
+	public PositionLookPacket(Location loc, byte flags, int teleportId, boolean dismountVehicle) {
 		this.x = loc.getX();
 		this.y = loc.getY();
 		this.z = loc.getZ();
@@ -129,6 +144,7 @@ public class PositionLookPacket extends AbstractPacket {
 		this.pitch = loc.getPitch();
 		this.flags = flags;
 		this.teleportId = teleportId;
+		this.dismountVehicle = dismountVehicle;
 	}
 
 	public boolean equals(Object o) {
@@ -163,6 +179,9 @@ public class PositionLookPacket extends AbstractPacket {
 		if (this.getTeleportId() != other.getTeleportId()) {
 			return false;
 		}
+		if (this.getDismountVehicle() != other.getDismountVehicle()) {
+			return false;
+		}
 		return true;
 	}
 
@@ -171,7 +190,7 @@ public class PositionLookPacket extends AbstractPacket {
 	}
 
 	public int hashCode() {
-		return Objects.hash(new Object[]{Double.valueOf(x), Double.valueOf(y), Double.valueOf(z), Float.valueOf(yaw), Float.valueOf(pitch), Byte.valueOf(flags), Integer.valueOf(teleportId)});
+		return Objects.hash(new Object[]{Double.valueOf(x), Double.valueOf(y), Double.valueOf(z), Float.valueOf(yaw), Float.valueOf(pitch), Byte.valueOf(flags), Integer.valueOf(teleportId), Boolean.valueOf(dismountVehicle)});
 	}
 
 	static {
@@ -202,5 +221,6 @@ public class PositionLookPacket extends AbstractPacket {
 		MAPPING.put(751, 0x34);
 		MAPPING.put(753, 0x34);
 		MAPPING.put(754, 0x34);
+		MAPPING.put(755, 0x38);
 	}
 }

@@ -5,6 +5,7 @@ import net.md_5.bungee.api.plugin.Plugin;
 import java.util.Random;
 
 import org.bstats.bungeecord.Metrics;
+import org.bstats.charts.SimplePie;
 
 public final class AutoReconnect extends Plugin {
 
@@ -38,6 +39,7 @@ public final class AutoReconnect extends Plugin {
 		getLogger().info("AutoReconnect: A fork of Bungeecord-Reconnect updated by PseudoResonance and AoElite");
 		// register Listener
 		getProxy().getPluginManager().registerListener(this, new DisconnectListener(this));
+		getProxy().getPluginManager().registerListener(this, new UserVersionCache());
 		
 		// load Configuration
 		config = new Config(this);
@@ -63,8 +65,8 @@ public final class AutoReconnect extends Plugin {
 		// Initialize bStats
 		metrics = new Metrics(this, 9174);
 		// Add custom charts
-		metrics.addCustomChart(new Metrics.SimplePie("old_pipeline_utils", () -> ReconnectTask.oldPipelineUtils ? "Enabled" : "Disabled"));
-		metrics.addCustomChart(new Metrics.SimplePie("old_event_groups", () -> ReconnectTask.oldEventGroups ? "Enabled" : "Disabled"));
+		metrics.addCustomChart(new SimplePie("old_pipeline_utils", () -> ReconnectTask.oldPipelineUtils ? "Enabled" : "Disabled"));
+		metrics.addCustomChart(new SimplePie("old_event_groups", () -> ReconnectTask.oldEventGroups ? "Enabled" : "Disabled"));
 	}
 
 	@Override

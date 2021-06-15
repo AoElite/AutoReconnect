@@ -68,25 +68,19 @@
 	</build>
 	<repositories>
 		<repository>
-			<id>sonatype-oss-repo</id>
-			<url>https://oss.sonatype.org/content/groups/public/</url>
+			<id>CodeMC</id>
+			<url>https://repo.codemc.org/repository/maven-public</url>
 		</repository>
 		<repository>
 			<id>exceptionflug</id>
 			<url>https://mvn.exceptionflug.de/repository/exceptionflug-public/</url>
 		</repository>
-		<repository>
-			<id>CodeMC</id>
-			<url>https://repo.codemc.org/repository/maven-public</url>
-		</repository>
 	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>net.md-5</groupId>
-			<artifactId>bungeecord</artifactId>
-			<version>1.17-SNAPSHOT</version>
-			<scope>system</scope>
-			<systemPath>${project.basedir}/dependencies/BungeeCord-1.17.jar</systemPath>
+			<artifactId>bungeecord-proxy</artifactId>
+			<version>1.17-R0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>de.exceptionflug</groupId>

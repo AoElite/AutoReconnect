@@ -103,6 +103,7 @@
 			<groupId>net.md-5</groupId>
 			<artifactId>bungeecord-proxy</artifactId>
 			<version>1.17-R0.1-SNAPSHOT</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>de.exceptionflug</groupId>

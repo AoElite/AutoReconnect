@@ -1,2 +1,6 @@
 /target/
 /dependency-reduced-pom.xml
+/bungee/
+/artifacts/
+/.idea/
+/.settings/

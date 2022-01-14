@@ -1,16 +1,32 @@
 package me.aoelite.bungee.autoreconnect.net.packets;
 
-import java.util.HashMap;
-
-import de.exceptionflug.protocolize.api.protocol.AbstractPacket;
-import de.exceptionflug.protocolize.world.Location;
+import dev.simplix.protocolize.api.PacketDirection;
+import dev.simplix.protocolize.api.mapping.AbstractProtocolMapping;
+import dev.simplix.protocolize.api.mapping.ProtocolIdMapping;
+import dev.simplix.protocolize.api.packet.AbstractPacket;
+import dev.simplix.protocolize.api.util.ProtocolUtil;
 import io.netty.buffer.ByteBuf;
+
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
-import net.md_5.bungee.protocol.ProtocolConstants;
+
+import static dev.simplix.protocolize.api.util.ProtocolVersions.*;
 
 public class PositionLookPacket extends AbstractPacket {
-	
-	public static final HashMap<Integer, Integer> MAPPING = new HashMap<Integer, Integer>();
+
+	public final static List<ProtocolIdMapping> MAPPINGS = Arrays.asList(
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_8, MINECRAFT_1_8, 0x08),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_9, MINECRAFT_1_12, 0x2e),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_12_1, MINECRAFT_1_12_2, 0x2f),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_13, MINECRAFT_1_13_2, 0x32),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_14, MINECRAFT_1_14_4, 0x35),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_15, MINECRAFT_1_15_2, 0x36),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_16, MINECRAFT_1_16_1, 0x35),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_16_2, MINECRAFT_1_16_5, 0x34),
+			AbstractProtocolMapping.rangedIdMapping(MINECRAFT_1_17, MINECRAFT_1_18, 0x38)
+	);
+
 	private double x;
 	private double y;
 	private double z;
@@ -20,29 +36,29 @@ public class PositionLookPacket extends AbstractPacket {
 	private int teleportId;
 	private boolean dismountVehicle;
 
-	public void read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion) {
+	public void read(ByteBuf buf, PacketDirection packetDirection, int protocolVersion) {
 		x = buf.readDouble();
 		y = buf.readDouble();
 		z = buf.readDouble();
 		yaw = buf.readFloat();
 		pitch = buf.readFloat();
 		flags = buf.readByte();
-		if (protocolVersion >= 79)
-			teleportId = PositionLookPacket.readVarInt(buf);
-		if (protocolVersion >= 755)
+		if (protocolVersion >= MINECRAFT_1_9)
+			teleportId = ProtocolUtil.readVarInt(buf);
+		if (protocolVersion >= MINECRAFT_1_17)
 			dismountVehicle = buf.readBoolean();
 	}
 
-	public void write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion) {
+	public void write(ByteBuf buf, PacketDirection packetDirection, int protocolVersion) {
 		buf.writeDouble(x);
 		buf.writeDouble(y);
 		buf.writeDouble(z);
 		buf.writeFloat(yaw);
 		buf.writeFloat(pitch);
 		buf.writeByte(flags);
-		if (protocolVersion >= 79)
-			PositionLookPacket.writeVarInt(teleportId, buf);
-		if (protocolVersion >= 755)
+		if (protocolVersion >= MINECRAFT_1_9)
+			ProtocolUtil.writeVarInt(buf, teleportId);
+		if (protocolVersion >= MINECRAFT_1_17)
 			buf.writeBoolean(dismountVehicle);
 	}
 
@@ -136,17 +152,6 @@ public class PositionLookPacket extends AbstractPacket {
 		this.dismountVehicle = dismountVehicle;
 	}
 
-	public PositionLookPacket(Location loc, byte flags, int teleportId, boolean dismountVehicle) {
-		this.x = loc.getX();
-		this.y = loc.getY();
-		this.z = loc.getZ();
-		this.yaw = loc.getYaw();
-		this.pitch = loc.getPitch();
-		this.flags = flags;
-		this.teleportId = teleportId;
-		this.dismountVehicle = dismountVehicle;
-	}
-
 	public boolean equals(Object o) {
 		if (o == this) {
 			return true;
@@ -191,37 +196,5 @@ public class PositionLookPacket extends AbstractPacket {
 
 	public int hashCode() {
 		return Objects.hash(new Object[]{Double.valueOf(x), Double.valueOf(y), Double.valueOf(z), Float.valueOf(yaw), Float.valueOf(pitch), Byte.valueOf(flags), Integer.valueOf(teleportId), Boolean.valueOf(dismountVehicle)});
-	}
-
-	static {
-		MAPPING.put(47, 0x08);
-		MAPPING.put(107, 0x2e);
-		MAPPING.put(108, 0x2e);
-		MAPPING.put(109, 0x2e);
-		MAPPING.put(110, 0x2e);
-		MAPPING.put(210, 0x2e);
-		MAPPING.put(315, 0x2e);
-		MAPPING.put(316, 0x2e);
-		MAPPING.put(335, 0x2e);
-		MAPPING.put(338, 0x2f);
-		MAPPING.put(340, 0x2f);
-		MAPPING.put(393, 0x32);
-		MAPPING.put(401, 0x32);
-		MAPPING.put(404, 0x32);
-		MAPPING.put(477, 0x35);
-		MAPPING.put(480, 0x35);
-		MAPPING.put(485, 0x35);
-		MAPPING.put(490, 0x35);
-		MAPPING.put(498, 0x35);
-		MAPPING.put(573, 0x36);
-		MAPPING.put(575, 0x36);
-		MAPPING.put(578, 0x36);
-		MAPPING.put(735, 0x35);
-		MAPPING.put(736, 0x35);
-		MAPPING.put(751, 0x34);
-		MAPPING.put(753, 0x34);
-		MAPPING.put(754, 0x34);
-		MAPPING.put(755, 0x38);
-		MAPPING.put(756, 0x38);
 	}
 }

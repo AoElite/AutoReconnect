@@ -5,7 +5,6 @@ import net.md_5.bungee.api.plugin.Plugin;
 import java.util.Random;
 
 import org.bstats.bungeecord.Metrics;
-import org.bstats.charts.SimplePie;
 
 public final class AutoReconnect extends Plugin {
 
@@ -23,15 +22,16 @@ public final class AutoReconnect extends Plugin {
 	 * An instance of {@linkReconnectHandler}
 	 */
 	private ReconnectHandler reconnectHandler;
-
+	
 	/**
-	 * Whether or not the Protocolize plugin is loaded
+	 * An instance of {@PacketManager}
 	 */
-	private static boolean isProtocolizeLoaded = false;
+	private PacketManager packetManager;
 	
 	/**
 	 * bStats instance
 	 */
+	@SuppressWarnings("unused")
 	private Metrics metrics;
 
 	@Override
@@ -48,13 +48,7 @@ public final class AutoReconnect extends Plugin {
 			getLogger().severe("Debug output is enabled!");
 
 		// load dependency support
-		try {
-			isProtocolizeLoaded = Class.forName("de.exceptionflug.protocolize.api.protocol.AbstractPacket") != null;
-		} catch (ClassNotFoundException e) {
-			isProtocolizeLoaded = false;
-		}
-		if (isProtocolizeLoaded())
-			PacketManager.register(this);
+		packetManager = new PacketManager(this);
 		
 		// load reconnection handler
 		reconnectHandler = new ReconnectHandler(this);
@@ -64,9 +58,6 @@ public final class AutoReconnect extends Plugin {
 		
 		// Initialize bStats
 		metrics = new Metrics(this, 9174);
-		// Add custom charts
-		metrics.addCustomChart(new SimplePie("old_pipeline_utils", () -> ReconnectTask.oldPipelineUtils ? "Enabled" : "Disabled"));
-		metrics.addCustomChart(new SimplePie("old_event_groups", () -> ReconnectTask.oldEventGroups ? "Enabled" : "Disabled"));
 	}
 
 	@Override
@@ -89,10 +80,10 @@ public final class AutoReconnect extends Plugin {
 	}
 
 	/**
-	 * @return true if Protocolize API is loaded
+	 * @return PacketManager instance
 	 */
-	public boolean isProtocolizeLoaded() {
-		return isProtocolizeLoaded;
+	public PacketManager getPacketManager() {
+		return packetManager;
 	}
 
 }

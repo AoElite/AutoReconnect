@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import me.aoelite.bungee.autoreconnect.api.ServerReconnectEvent;
-import me.aoelite.bungee.autoreconnect.net.packets.PacketManager;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
@@ -107,7 +106,7 @@ public class ReconnectHandler {
 	private void reconnect(UserConnection user, ServerConnection server, String kickMessage) {
 		if (autoReconnect.getConfig().isDebugEnabled())
 			autoReconnect.getLogger().info("Reconnecting user " + user.getDisplayName() + " (" + user.getUUID() + ") to " + server.getInfo().getName() + " because of kick: " + kickMessage);
-		if (autoReconnect.isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
+		if (autoReconnect.getPacketManager().isProtocolizeLoaded() && autoReconnect.getConfig().getMoveToEmptyWorld()) {
 			if (autoReconnect.getConfig().isDebugEnabled())
 				autoReconnect.getLogger().info("Attempting to move to limbo");
 			int version = UserVersionCache.getPlayerProtocolVersion(user.getUniqueId());
@@ -128,7 +127,7 @@ public class ReconnectHandler {
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
 						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(version), newDimension,
-						LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 0, "", 10, false, false, false, false));
+						LimboDimensionType.DIMENSION_NAME, 0L, (short) 0, 0, "", 10, 10, false, false, false, false));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();
 				for (UUID bossbar : user.getSentBossBars()) {
@@ -149,7 +148,7 @@ public class ReconnectHandler {
 				}
 				user.getSentBossBars().clear();
 			}
-			user.unsafe().sendPacket(PacketManager.getPositionLookPacket());
+			autoReconnect.getPacketManager().sendPositionLookPacket(user);
 		}
 		ReconnectTask reconnectTask = reconnectTasks.get(user.getUniqueId());
 		if (reconnectTask == null) {

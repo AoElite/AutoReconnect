@@ -42,8 +42,9 @@ public class ReconnectTask {
 
 	protected static boolean oldPipelineUtils = false;
 	private static Method getPipelineChannel = null;
-	protected static boolean oldEventGroups = false;
+	protected static boolean waterfallEventGroups = false;
 	private static Field eventGroupsField = null;
+	private static EventLoopGroup eventGroupsCache = null;
 
 	private final AutoReconnect instance;
 	private final ProxyServer bungee;
@@ -141,7 +142,7 @@ public class ReconnectTask {
 				// Otherwise, disconnect the user with a "Lost Connection"-message.
 				// If do-not-disconnect is set to true in config, and the player can enter
 				// limbo, they will be left in limbo instead
-				if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
+				if (instance.getConfig().getMoveToEmptyWorld() && instance.getPacketManager().isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 					if (!instance.getConfig().getFailedChat().isEmpty())
 						user.sendMessage(instance.getConfig().getFailedChat().replace("{%reason%}", kickMessage).replace("{%server%}", server.getInfo().getName()));
 					if (!instance.getConfig().getFailedActionBar().isEmpty())
@@ -296,7 +297,7 @@ public class ReconnectTask {
 				} else {
 					if (instance.getConfig().isDebugEnabled())
 						instance.getLogger().info("Connection failed for " + user.getDisplayName() + " (" + user.getUUID() + ") to " + target.getName() + " Will leave in limbo or disconnect if unavailable");
-					if (instance.getConfig().getMoveToEmptyWorld() && instance.isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
+					if (instance.getConfig().getMoveToEmptyWorld() && instance.getPacketManager().isProtocolizeLoaded() && instance.getConfig().getDoNotDisconnect()) {
 						user.sendMessage(instance.getConfig().getLimboText());
 						user.setServer(new LimboServer(instance));
 					} else {
@@ -427,14 +428,20 @@ public class ReconnectTask {
 	}
 	
 	private EventLoopGroup getEventLoopGroup() {
-		if (!oldEventGroups)
-			return BungeeCord.getInstance().eventLoops;
-		else
+		if (eventGroupsCache != null && !eventGroupsCache.isShutdown()) {
+			return eventGroupsCache;
+		}
+		if (!waterfallEventGroups) {
 			try {
-				return (EventLoopGroup) eventGroupsField.get(BungeeCord.getInstance());
+				eventGroupsCache = (EventLoopGroup) eventGroupsField.get(BungeeCord.getInstance());
+				return eventGroupsCache;
 			} catch (ClassCastException | IllegalAccessException | IllegalArgumentException e) {
 				e.printStackTrace();
 			}
+		} else {
+			eventGroupsCache = BungeeCord.getInstance().workerEventLoopGroup;
+			return eventGroupsCache;
+		}
 		return null;
 	}
 	
@@ -454,14 +461,15 @@ public class ReconnectTask {
 			}
 		}
 		try {
-			BungeeCord.class.getField("eventLoops");
+			BungeeCord.class.getField("workerEventLoopGroup");
+			waterfallEventGroups = true;
 		} catch (NoSuchFieldException | SecurityException e) {
-			oldEventGroups = true;
+			waterfallEventGroups = false;
 		}
-		if (oldEventGroups) {
-			Logger.getLogger("AutoReconnect").info("Detected old BungeeCord build! Using compatibility mode for event loop group!");
+		if (!waterfallEventGroups) {
+			Logger.getLogger("AutoReconnect").info("Detected BungeeCord build! Using compatibility mode for event loop group!");
 			try {
-				eventGroupsField = BungeeCord.class.getField("workerEventLoopGroup");
+				eventGroupsField = BungeeCord.class.getField("eventLoops");
 				eventGroupsField.setAccessible(true);
 			} catch (NoSuchFieldException | SecurityException e) {
 				e.printStackTrace();

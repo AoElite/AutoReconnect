@@ -16,6 +16,7 @@ import net.md_5.bungee.api.event.ServerKickEvent;
 import net.md_5.bungee.chat.ComponentSerializer;
 import net.md_5.bungee.connection.CancelSendSignal;
 import net.md_5.bungee.connection.DownstreamBridge;
+import net.md_5.bungee.netty.ChannelWrapper;
 import net.md_5.bungee.protocol.packet.Kick;
 
 public class ReconnectBridge extends DownstreamBridge {
@@ -70,6 +71,48 @@ public class ReconnectBridge extends DownstreamBridge {
 					createTitle(instance.getConfig().getRejectedTitle().replace("{%reason%}", errorMessage).replace("{%server%}", server.getInfo().getName())).send(user);
 			} else {
 				user.disconnect(instance.getConfig().getKickText().isEmpty() ? Util.exception(t) : instance.getConfig().getKickText().replace("{%reason%}", Util.exception(t)).replace("{%server%}", server.getInfo().getName()));
+			}
+		} else {
+			// Otherwise, reconnect the User if he is still online.
+			instance.getReconnectHandler().reconnectIfOnline(user, server, errorMessage);
+		}
+	}
+
+	@Override
+	public void disconnected(ChannelWrapper channel) throws Exception {
+		String errorMessage = bungee.getTranslation("server_went_down");
+		// Usually, BungeeCord would reconnect the Player to the fallback server or kick
+		// him if not
+		// Fallback Server is available, when an Exception between the BungeeCord and
+		// the Minecraft Server
+		// occurs. We override this Method so that we can try to reconnect the client
+		// instead.
+
+		if (server.isObsolete()) {
+			// do not perform any actions if the user has already moved
+			return;
+		}
+		// setObsolete so that DownstreamBridge.disconnected(ChannelWrapper) won't be
+		// called.
+		server.setObsolete(true);
+
+		// Fire ServerReconnectEvent and give plugins the possibility to cancel server
+		// reconnecting.
+		if (!instance.getReconnectHandler().fireServerReconnectEvent(user, server)) {
+			// Invoke default behaviour if event has been cancelled.
+			ServerInfo def = user.updateAndGetNextServer((ServerInfo) this.server.getInfo());
+			if (def != null) {
+				// Attempt connection to fallback server
+				user.connectNow(def, ServerConnectEvent.Reason.SERVER_DOWN_REDIRECT);
+				// Send error message to user to inform them why they were kicked
+				if (!instance.getConfig().getRejectedChat().isEmpty())
+					user.sendMessage(instance.getConfig().getRejectedChat().replace("{%reason%}", errorMessage).replace("{%server%}", server.getInfo().getName()));
+				if (!instance.getConfig().getRejectedActionBar().isEmpty())
+					user.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(instance.getConfig().getRejectedActionBar().replace("{%reason%}", errorMessage).replace("{%server%}", server.getInfo().getName())));
+				if (!instance.getConfig().getRejectedTitle().isEmpty())
+					createTitle(instance.getConfig().getRejectedTitle().replace("{%reason%}", errorMessage).replace("{%server%}", server.getInfo().getName())).send(user);
+			} else {
+				user.disconnect(instance.getConfig().getKickText().isEmpty() ? errorMessage : instance.getConfig().getKickText().replace("{%reason%}", errorMessage).replace("{%server%}", server.getInfo().getName()));
 			}
 		} else {
 			// Otherwise, reconnect the User if he is still online.

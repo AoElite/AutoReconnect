@@ -44,6 +44,7 @@ public class Config {
 	private int maxReconnectTries = 2;
 	private long reconnectTime = 1000;
 	private long reconnectTimeout = 5000;
+	private String reconnectingMusic = "minecraft:music.creative";
 	private List<String> ignoredServers = new ArrayList<>();
 	private String shutdownMessage = "Server closed";
 	private Pattern shutdownPattern = null;
@@ -105,6 +106,7 @@ public class Config {
 				maxReconnectTries = Math.max(configuration.getInt("max-reconnect-tries", maxReconnectTries), 1);
 				reconnectTime = Math.max(configuration.getLong("reconnect-time", reconnectTime), 0);
 				reconnectTimeout = Math.max(configuration.getLong("reconnect-timeout", reconnectTimeout), 1000);
+				reconnectingMusic = configuration.getString("reconnecting-music", reconnectingMusic);
 				ignoredServers = configuration.getStringList("ignored-servers");
 				String shutdownText = configuration.getString("shutdown.text", shutdownMessage);
 				if (Strings.isNullOrEmpty(shutdownText)) {
@@ -299,6 +301,13 @@ public class Config {
 	 */
 	public long getReconnectTimeout() {
 		return reconnectTimeout;
+	}
+	
+	/**
+	 * @return ID of music to play while client is waiting to reconnect
+	 */
+	public String getReconnectingMusic() {
+		return reconnectingMusic;
 	}
 
 	/**

@@ -4,7 +4,7 @@
 # The current version of this configuration. Do NOT change this value!
 # If the plugin uses a more recent config version, this config gets replaced by it
 # while a backup of the old config will be kept as "config.old.yml".
-version: 6
+version: 7
 
 # The text that should be displayed, when the plugin is trying to reconnect a player.
 # Leave empty if you don't wish any title or action bar message to be displayed.
@@ -89,6 +89,9 @@ reconnect-time: 2000
 # The amount of milliseconds the plugin should wait for a reply from the previous server, until it
 # decides to abort that reconnect try. This value cannot be less than 1000.
 reconnect-timeout: 5000
+
+# ID of music to play while client is reconnecting. Leave empty to disable.
+reconnecting-music: "minecraft:music.creative"
 
 # A List containing all servers that don't allow automatic reconnecting.
 ignored-servers: [dummy, dummy2]

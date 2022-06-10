@@ -25,12 +25,35 @@ public class LimboDimensionType {
 	private static NamedTag LOGIN_REGISTRY_1_17 = null;
 	private static NamedTag CURRENT_DIMENSION_1_17 = null;
 	
-	public static NamedTag getLimboLoginRegistry(int protocolVersion) {
-		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
+	private static NamedTag LOGIN_REGISTRY_1_18_2 = null;
+	private static NamedTag CURRENT_DIMENSION_1_18_2 = null;
+	
+	private static NamedTag LOGIN_REGISTRY_1_19 = null;
+	private static NamedTag CURRENT_DIMENSION_1_19 = null;
+	
+	public static NamedTag getLimboLoginRegistry(AutoReconnect plugin, int protocolVersion) {
+		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19) {
+			if (LOGIN_REGISTRY_1_19 == null) {
+				CompoundTag ret = new CompoundTag();
+				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
+				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
+				ret.add("minecraft:chat_type", getLimboLoginChatType());
+				LOGIN_REGISTRY_1_19 = new NamedTag("", ret);
+			}
+			return LOGIN_REGISTRY_1_19;
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_18_2) {
+			if (LOGIN_REGISTRY_1_18_2 == null) {
+				CompoundTag ret = new CompoundTag();
+				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
+				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
+				LOGIN_REGISTRY_1_18_2 = new NamedTag("", ret);
+			}
+			return LOGIN_REGISTRY_1_18_2;
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
 			if (LOGIN_REGISTRY_1_17 == null) {
 				CompoundTag ret = new CompoundTag();
 				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
-				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes());
+				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
 				LOGIN_REGISTRY_1_17 = new NamedTag("", ret);
 			}
 			return LOGIN_REGISTRY_1_17;
@@ -38,7 +61,7 @@ public class LimboDimensionType {
 			if (LOGIN_REGISTRY_1_16_2 == null) {
 				CompoundTag ret = new CompoundTag();
 				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
-				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes());
+				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
 				LOGIN_REGISTRY_1_16_2 = new NamedTag("", ret);
 			}
 			return LOGIN_REGISTRY_1_16_2;
@@ -54,8 +77,18 @@ public class LimboDimensionType {
 		}
 	}
 
-	public static Object getLimboCurrentDimension(int protocolVersion) {
-		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
+	public static Object getLimboCurrentDimension(AutoReconnect plugin, int protocolVersion) {
+		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19) {
+			if (CURRENT_DIMENSION_1_19 == null) {
+				CURRENT_DIMENSION_1_19 = new NamedTag("", getLimboDimensionElement_1_19());
+			}
+			return CURRENT_DIMENSION_1_19;
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_18_2) {
+			if (CURRENT_DIMENSION_1_18_2 == null) {
+				CURRENT_DIMENSION_1_18_2 = new NamedTag("", getLimboDimensionElement_1_18_2());
+			}
+			return CURRENT_DIMENSION_1_18_2;
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
 			if (CURRENT_DIMENSION_1_17 == null) {
 				CURRENT_DIMENSION_1_17 = new NamedTag("", getLimboDimensionElement_1_17());
 			}
@@ -83,12 +116,59 @@ public class LimboDimensionType {
 		CompoundTag dimension = new CompoundTag();
 		dimension.add("name", new StringTag(DIMENSION_NAME));
 		dimension.add("id", new IntTag(0));
-		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
+		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19) {
+			dimension.add("element", getLimboDimensionElement_1_19());
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_18_2) {
+			dimension.add("element", getLimboDimensionElement_1_18_2());
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_17) {
 			dimension.add("element", getLimboDimensionElement_1_17());
 		} else {
 			dimension.add("element", getLimboDimensionElement_1_16_2());
 		}
 		return dimension;
+	}
+	
+	private static CompoundTag getLimboDimensionElement_1_19() {
+		CompoundTag element = new CompoundTag();
+		element.add("piglin_safe", new ByteTag(0));
+		element.add("has_raids", new ByteTag(0));
+		element.add("monster_spawn_light_level", new IntTag(0));
+		element.add("monster_spawn_block_light_limit", new IntTag(0));
+		element.add("natural", new ByteTag(0));
+		element.add("ambient_light", new FloatTag(0));
+		element.add("fixed_time", new LongTag(18000));
+		element.add("infiniburn", new StringTag("#minecraft:infiniburn_overworld"));
+		element.add("respawn_anchor_works", new ByteTag(0));
+		element.add("has_skylight", new ByteTag(0));
+		element.add("bed_works", new ByteTag(0));
+		element.add("effects", new StringTag("minecraft:the_end"));
+		element.add("min_y", new IntTag(0));
+		element.add("height", new IntTag(256));
+		element.add("logical_height", new IntTag(256));
+		element.add("coordinate_scale", new DoubleTag(1.0));
+		element.add("ultrawarm", new ByteTag(0));
+		element.add("has_ceiling", new ByteTag(0));
+		return element;
+	}
+	
+	private static CompoundTag getLimboDimensionElement_1_18_2() {
+		CompoundTag element = new CompoundTag();
+		element.add("natural", new ByteTag(0));
+		element.add("ambient_light", new FloatTag(0));
+		element.add("ultrawarm", new ByteTag(0));
+		element.add("has_ceiling", new ByteTag(0));
+		element.add("has_skylight", new ByteTag(0));
+		element.add("piglin_safe", new ByteTag(0));
+		element.add("bed_works", new ByteTag(0));
+		element.add("respawn_anchor_works", new ByteTag(0));
+		element.add("has_raids", new ByteTag(0));
+		element.add("logical_height", new IntTag(256));
+		element.add("infiniburn", new StringTag("#minecraft:infiniburn_overworld"));
+		element.add("min_y", new IntTag(0));
+		element.add("height", new IntTag(256));
+		element.add("coordinate_scale", new DoubleTag(1.0));
+		element.add("effects", new StringTag("minecraft:the_end"));
+		return element;
 	}
 	
 	private static CompoundTag getLimboDimensionElement_1_17() {
@@ -150,16 +230,16 @@ public class LimboDimensionType {
 		return element;
 	}
 
-	private static CompoundTag getLimboLoginRegistryBiomes() {
+	private static CompoundTag getLimboLoginRegistryBiomes(AutoReconnect plugin) {
 		CompoundTag ret = new CompoundTag();
 		ListTag list = new ListTag(CompoundTag.TAG_COMPOUND, Collections.emptyList());
-		list.add(getPlainsBiome());
+		list.add(getPlainsBiome(plugin));
 		ret.add("type", new StringTag("minecraft:worldgen/biome"));
 		ret.add("value", list);
 		return ret;
 	}
 
-	private static CompoundTag getPlainsBiome() {
+	private static CompoundTag getPlainsBiome(AutoReconnect plugin) {
 		CompoundTag biome = new CompoundTag();
 		biome.add("name", new StringTag("minecraft:plains"));
 		biome.add("id", new IntTag(1));
@@ -173,12 +253,12 @@ public class LimboDimensionType {
 		effects.add("fog_color", new IntTag(12638463));
 		effects.add("water_color", new IntTag(4159204));
 		
-		CompoundTag mood_sound = new CompoundTag();
-		mood_sound.add("tick_delay", new IntTag(6000));
-		mood_sound.add("offset", new DoubleTag(2.0));
-		mood_sound.add("sound", new StringTag("minecraft:ambient.cave"));
-		mood_sound.add("block_search_extent", new IntTag(8));
-		effects.add("mood_sound", mood_sound);
+		CompoundTag music = new CompoundTag();
+		music.add("replace_current_music", new ByteTag(1));
+		music.add("sound", new StringTag(plugin.getConfig().getReconnectingMusic()));
+		music.add("max_delay", new IntTag(1));
+		music.add("min_delay", new IntTag(0));
+		effects.add("music", music);
 		
 		element.add("effects", effects);
 		
@@ -190,6 +270,43 @@ public class LimboDimensionType {
 		
 		biome.add("element", element);
 		return biome;
+	}
+
+	private static CompoundTag getLimboLoginChatType() {
+		CompoundTag ret = new CompoundTag();
+		ListTag list = new ListTag(CompoundTag.TAG_COMPOUND, Collections.emptyList());
+		list.add(getChatSystem());
+		list.add(getChatGameInfo());
+		ret.add("type", new StringTag("minecraft:chat_type"));
+		ret.add("value", list);
+		return ret;
+	}
+
+	private static CompoundTag getChatSystem() {
+		CompoundTag chat = new CompoundTag();
+		chat.add("name", new StringTag("minecraft:system"));
+		chat.add("id", new IntTag(0));
+		
+		CompoundTag element = new CompoundTag();
+		element.add("chat", new CompoundTag());
+		CompoundTag narration = new CompoundTag();
+		narration.add("priority", new StringTag("system"));
+		element.add("narration", narration);
+		
+		chat.add("element", element);
+		return chat;
+	}
+
+	private static CompoundTag getChatGameInfo() {
+		CompoundTag chat = new CompoundTag();
+		chat.add("name", new StringTag("minecraft:game_info"));
+		chat.add("id", new IntTag(1));
+		
+		CompoundTag element = new CompoundTag();
+		element.add("overlay", new CompoundTag());
+		
+		chat.add("element", element);
+		return chat;
 	}
 
 }

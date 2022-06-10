@@ -11,6 +11,7 @@ import me.aoelite.bungee.autoreconnect.api.ServerReconnectEvent;
 import net.md_5.bungee.BungeeCord;
 import net.md_5.bungee.ServerConnection;
 import net.md_5.bungee.UserConnection;
+import net.md_5.bungee.protocol.Location;
 import net.md_5.bungee.protocol.ProtocolConstants;
 import net.md_5.bungee.protocol.packet.BossBar;
 import net.md_5.bungee.protocol.packet.KeepAlive;
@@ -20,6 +21,11 @@ import net.md_5.bungee.protocol.packet.Respawn;
 public class ReconnectHandler {
 
 	private final AutoReconnect autoReconnect;
+	
+	/**
+	 * 0, 0, 0 position
+	 */
+	private static final Location DEFAULT_LOCATION = new Location(LimboDimensionType.DIMENSION_NAME, 0L);
 
 	/**
 	 * A HashMap containing all reconnect tasks.
@@ -113,33 +119,41 @@ public class ReconnectHandler {
 			if (version >= ProtocolConstants.MINECRAFT_1_16) {
 				if (autoReconnect.getConfig().isDebugEnabled())
 					autoReconnect.getLogger().info("Version 1.16 or greater");
-				Object newDimension = LimboDimensionType.getLimboCurrentDimension(version);
-				if (version >= ProtocolConstants.MINECRAFT_1_17) {
-					if (autoReconnect.getConfig().isDebugEnabled())
+				if (autoReconnect.getConfig().isDebugEnabled()) {
+					if (version >= ProtocolConstants.MINECRAFT_1_19) {
+						autoReconnect.getLogger().info("Version 1.19 or greater");
+					} else if (version >= ProtocolConstants.MINECRAFT_1_18_2) {
+						autoReconnect.getLogger().info("Version 1.18.2");
+					} else if (version >= ProtocolConstants.MINECRAFT_1_17) {
 						autoReconnect.getLogger().info("Version 1.17 or greater");
-				} else if (version >= ProtocolConstants.MINECRAFT_1_16_2) {
-					if (autoReconnect.getConfig().isDebugEnabled())
+					} else if (version >= ProtocolConstants.MINECRAFT_1_16_2) {
 						autoReconnect.getLogger().info("Version 1.16.2-.5");
-				} else {
-					if (autoReconnect.getConfig().isDebugEnabled())
+					} else {
 						autoReconnect.getLogger().info("Version 1.16/1.16.1");
+					}
+				}
+				Object newDimension = null;
+				if (version >= ProtocolConstants.MINECRAFT_1_19) {
+					newDimension = LimboDimensionType.DIMENSION_NAME;
+				} else {
+					newDimension = LimboDimensionType.getLimboCurrentDimension(autoReconnect, version);
 				}
 				short previousGamemode = (short) user.getGamemode();
 				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
-						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(version), newDimension,
-						LimboDimensionType.DIMENSION_NAME, 0L, (short) 0, 0, "", 10, 10, false, false, false, false));
+						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(autoReconnect, version), newDimension,
+						LimboDimensionType.DIMENSION_NAME, 0L, (short) 0, 0, "", 10, 10, false, false, false, false, DEFAULT_LOCATION));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();
 				for (UUID bossbar : user.getSentBossBars()) {
 					user.unsafe().sendPacket(new BossBar(bossbar, 1));
 				}
 				user.getSentBossBars().clear();
-				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 2, previousGamemode, "", false, false, false));
+				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 2, previousGamemode, "", false, false, false, DEFAULT_LOCATION));
 			} else {
 				if (autoReconnect.getConfig().isDebugEnabled())
 					autoReconnect.getLogger().info("Version pre-1.16");
 				Object newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
-				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, false));
+				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, false, DEFAULT_LOCATION));
 				user.setGamemode(2);
 				user.setDimension(newDim);
 				user.getServerSentScoreboard().clear();

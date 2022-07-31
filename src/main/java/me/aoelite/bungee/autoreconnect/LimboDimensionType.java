@@ -258,7 +258,7 @@ public class LimboDimensionType {
 		music.add("sound", new StringTag(plugin.getConfig().getReconnectingMusic()));
 		music.add("max_delay", new IntTag(1));
 		music.add("min_delay", new IntTag(0));
-		effects.add("music", music);
+		effects.add("music", master);
 		
 		element.add("effects", effects);
 		

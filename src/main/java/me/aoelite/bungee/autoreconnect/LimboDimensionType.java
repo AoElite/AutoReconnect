@@ -31,13 +31,24 @@ public class LimboDimensionType {
 	private static NamedTag LOGIN_REGISTRY_1_19 = null;
 	private static NamedTag CURRENT_DIMENSION_1_19 = null;
 	
+	private static NamedTag LOGIN_REGISTRY_1_19_1 = null;
+	
 	public static NamedTag getLimboLoginRegistry(AutoReconnect plugin, int protocolVersion) {
-		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19) {
+		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19_1) {
+			if (LOGIN_REGISTRY_1_19_1 == null) {
+				CompoundTag ret = new CompoundTag();
+				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
+				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
+				ret.add("minecraft:chat_type", getLimboLoginChatType(protocolVersion));
+				LOGIN_REGISTRY_1_19_1 = new NamedTag("", ret);
+			}
+			return LOGIN_REGISTRY_1_19_1;
+		} else if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19) {
 			if (LOGIN_REGISTRY_1_19 == null) {
 				CompoundTag ret = new CompoundTag();
 				ret.add("minecraft:dimension_type", getLimboLoginRegistryDimensions(protocolVersion));
 				ret.add("minecraft:worldgen/biome", getLimboLoginRegistryBiomes(plugin));
-				ret.add("minecraft:chat_type", getLimboLoginChatType());
+				ret.add("minecraft:chat_type", getLimboLoginChatType(protocolVersion));
 				LOGIN_REGISTRY_1_19 = new NamedTag("", ret);
 			}
 			return LOGIN_REGISTRY_1_19;
@@ -272,14 +283,67 @@ public class LimboDimensionType {
 		return biome;
 	}
 
-	private static CompoundTag getLimboLoginChatType() {
+	private static CompoundTag getLimboLoginChatType(int protocolVersion) {
 		CompoundTag ret = new CompoundTag();
 		ListTag list = new ListTag(CompoundTag.TAG_COMPOUND, Collections.emptyList());
-		list.add(getChatSystem());
-		list.add(getChatGameInfo());
+		if (protocolVersion >= ProtocolConstants.MINECRAFT_1_19_1) {
+			list.add(getChatChat());
+			list.add(getChatRaw());
+		} else {
+			list.add(getChatSystem());
+			list.add(getChatGameInfo());
+		}
 		ret.add("type", new StringTag("minecraft:chat_type"));
 		ret.add("value", list);
 		return ret;
+	}
+
+	private static CompoundTag getChatChat() {
+		CompoundTag chat = new CompoundTag();
+		chat.add("name", new StringTag("minecraft:chat"));
+		chat.add("id", new IntTag(0));
+		
+		CompoundTag element = new CompoundTag();
+		CompoundTag chatElement = new CompoundTag();
+		chatElement.add("translation_key", new StringTag("chat.type.text"));
+		ListTag chatParameters = new ListTag(StringTag.TAG_STRING, Collections.emptyList());
+		chatParameters.add(new StringTag("sender"));
+		chatParameters.add(new StringTag("content"));
+		chatElement.add("parameters", chatParameters);
+		element.add("chat", chatElement);
+		CompoundTag narration = new CompoundTag();
+		narration.add("translation_key", new StringTag("chat.type.text.narrate"));
+		ListTag narrationParameters = new ListTag(StringTag.TAG_STRING, Collections.emptyList());
+		narrationParameters.add(new StringTag("sender"));
+		narrationParameters.add(new StringTag("content"));
+		narration.add("parameters", narrationParameters);
+		element.add("narration", narration);
+		
+		chat.add("element", element);
+		return chat;
+	}
+
+	private static CompoundTag getChatRaw() {
+		CompoundTag chat = new CompoundTag();
+		chat.add("name", new StringTag("minecraft:raw"));
+		chat.add("id", new IntTag(1));
+		
+		CompoundTag element = new CompoundTag();
+		CompoundTag chatElement = new CompoundTag();
+		chatElement.add("translation_key", new StringTag("%s"));
+		ListTag chatParameters = new ListTag(StringTag.TAG_STRING, Collections.emptyList());
+		chatParameters.add(new StringTag("content"));
+		chatElement.add("parameters", chatParameters);
+		element.add("chat", chatElement);
+		CompoundTag narration = new CompoundTag();
+		narration.add("translation_key", new StringTag("%s"));
+		ListTag narrationParameters = new ListTag(StringTag.TAG_STRING, Collections.emptyList());
+		narrationParameters.add(new StringTag("content"));
+		narration.add("parameters", narrationParameters);
+		element.add("narration", narration);
+		
+		chat.add("element", element);
+		return chat;
 	}
 
 	private static CompoundTag getChatSystem() {

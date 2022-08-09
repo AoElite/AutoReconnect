@@ -6,7 +6,7 @@
 
 	<groupId>me.aoelite.bungee</groupId>
 	<artifactId>AutoReconnect</artifactId>
-	<version>1.6.9</version>
+	<version>1.6.10</version>
 	<packaging>jar</packaging>
 
 	<name>AutoReconnect</name>
@@ -90,6 +90,10 @@
             <id>exceptionflug</id>
             <url>https://mvn.exceptionflug.de/repository/exceptionflug-public/</url>
         </repository>
+		<repository>
+			<id>pseudo-repo</id>
+			<url>https://nexus.otake.pw/repository/maven-public/</url>
+		</repository>
 	</repositories>
 	<dependencies>
 		<dependency>
@@ -101,13 +105,13 @@
         <dependency>
             <groupId>dev.simplix</groupId>
             <artifactId>protocolize-api</artifactId>
-            <version>2.2.1</version>
+            <version>2.2.2</version>
             <scope>provided</scope>
         </dependency>
 		<dependency>
 			<groupId>org.bstats</groupId>
 			<artifactId>bstats-bungeecord</artifactId>
-			<version>2.2.1</version>
+			<version>3.0.0</version>
 		</dependency>
 	</dependencies>
 </project>

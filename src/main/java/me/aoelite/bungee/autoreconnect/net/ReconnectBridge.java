@@ -90,7 +90,11 @@ public class ReconnectBridge extends DownstreamBridge {
 		// instead.
 
 		server.getInfo().removePlayer(user);
-		
+
+		if (bungee.getReconnectHandler() != null) {
+			bungee.getReconnectHandler().setServer(user);
+		}
+
 		if (server.isObsolete()) {
 			// do not perform any actions if the user has already moved
 			return;

@@ -9,8 +9,5 @@
         <module name="AutoReconnect" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="AutoReconnect" target="1.8" />
-    </bytecodeTargetLevel>
   </component>
 </project>

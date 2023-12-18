@@ -139,21 +139,20 @@ public class ReconnectHandler {
 					newDimension = LimboDimensionType.getLimboCurrentDimension(autoReconnect, version);
 				}
 				short previousGamemode = (short) user.getGamemode();
-				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2,
-						previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(autoReconnect, version), newDimension,
-						LimboDimensionType.DIMENSION_NAME, 0L, (short) 0, 0, "", 10, 10, false, false, false, false, DEFAULT_LOCATION));
+				user.unsafe().sendPacket(new Login(user.getClientEntityId(), false, (short) 2, previousGamemode, new HashSet<String>(Arrays.asList(LimboDimensionType.DIMENSION_NAME)), LimboDimensionType.getLimboLoginRegistry(autoReconnect, version), newDimension,
+						LimboDimensionType.DIMENSION_NAME, 0L, (short) 0, 0, "", 10, 10, false, false,	false, false, false, DEFAULT_LOCATION, 0));
 				user.setGamemode(2);
 				user.getServerSentScoreboard().clear();
 				for (UUID bossbar : user.getSentBossBars()) {
 					user.unsafe().sendPacket(new BossBar(bossbar, 1));
 				}
 				user.getSentBossBars().clear();
-				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0, (short) 0, (short) 2, previousGamemode, "", false, false, false, DEFAULT_LOCATION));
+				user.unsafe().sendPacket(new Respawn(newDimension, LimboDimensionType.DIMENSION_NAME, 0,(short) 0, (short) 2, previousGamemode, "", false, false, (byte)0, DEFAULT_LOCATION, 0));
 			} else {
 				if (autoReconnect.getConfig().isDebugEnabled())
 					autoReconnect.getLogger().info("Version pre-1.16");
 				Object newDim = (Integer) user.getDimension() <= 0 ? 1 : 0;
-				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, false, DEFAULT_LOCATION));
+				user.unsafe().sendPacket(new Respawn(newDim, "", 0L, (short) 0, (short) 2, (short) 2, "default", false, false, (byte)0, DEFAULT_LOCATION, 0));
 				user.setGamemode(2);
 				user.setDimension(newDim);
 				user.getServerSentScoreboard().clear();

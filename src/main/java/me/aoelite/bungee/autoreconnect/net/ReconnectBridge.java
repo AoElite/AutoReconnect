@@ -139,11 +139,11 @@ public class ReconnectBridge extends DownstreamBridge {
 		// .getFallbackServer()
 		ServerInfo def = user.updateAndGetNextServer(server.getInfo());
 		// Call ServerKickEvent
-		ServerKickEvent event = bungee.getPluginManager().callEvent(new ServerKickEvent(user, server.getInfo(), ComponentSerializer.parse(kick.getMessage()), def, ServerKickEvent.State.CONNECTED, ServerKickEvent.Cause.SERVER));
+		ServerKickEvent event = bungee.getPluginManager().callEvent(new ServerKickEvent(user, server.getInfo(), kick.getMessage(), def, ServerKickEvent.State.CONNECTED, ServerKickEvent.Cause.SERVER));
 		if (event.isCancelled() && event.getCancelServer() != null) {
 			user.connectNow(event.getCancelServer(), ServerConnectEvent.Reason.KICK_REDIRECT);
 		} else {
-			String kickMessageColor = BaseComponent.toLegacyText(ComponentSerializer.parse(kick.getMessage()));
+			String kickMessageColor = BaseComponent.toLegacyText(kick.getMessage());
 			String kickMessage = ChatColor.stripColor(kickMessageColor); // needs to be parsed like that...
 			// doReconnect indicates whether the player should be reconnected or not after
 			// he has been kicked. Only if the kick reason matches the one that has been
